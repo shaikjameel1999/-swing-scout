@@ -469,3 +469,98 @@ function renderPlan(p) {
 
   return html;
 }
+  
+// ===== COMPARE TABLE =====
+function renderCompareTable() {
+  var slot = $('anCompareSlot');
+  if (!slot) return;
+  if (compareList.length < 2) { slot.innerHTML = ''; return; }
+
+  var picks = compareList.map(function(s) {
+    return MOCK.picks.find(function(p) { return p.symbol === s; }) || { symbol: s, notFound: true };
+  });
+
+  var html = '<h3 class="mb-3">Comparison</h3>';
+  html += '<div class="card" style="overflow-x:auto;">';
+  html += '<table class="table">';
+  html += '<thead><tr><th>Metric</th>';
+  picks.forEach(function(p) { html += '<th>' + p.symbol + '</th>'; });
+  html += '</tr></thead><tbody>';
+
+  var rows = [
+    ['Group', function(p) { return p.group || '—'; }],
+    ['Setup', function(p) { return p.setup || '—'; }],
+    ['Score', function(p) { return p.score || '—'; }],
+    ['Entry', function(p) { return p.entryZone ? p.entryZone[0] + '–' + p.entryZone[1] : '—'; }],
+    ['Stop', function(p) { return p.stop || '—'; }],
+    ['T1', function(p) { return p.t1 || '—'; }],
+    ['R:R', function(p) { return p.rr ? p.rr + ':1' : '—'; }],
+    ['Qty', function(p) { return p.qty || '—'; }],
+    ['Risk ₹', function(p) { return p.riskInr || '—'; }]
+  ];
+
+  rows.forEach(function(row) {
+    html += '<tr><td class="muted">' + row[0] + '</td>';
+    picks.forEach(function(p) {
+      html += '<td class="mono">' + (p.notFound ? '—' : row[1](p)) + '</td>';
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  slot.innerHTML = html;
+}
+
+// ===== EVENT LISTENERS =====
+$('analyzeBtn').addEventListener('click', function() {
+  analyze($('analystInput').value);
+});
+
+$('analystInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') analyze($('analystInput').value);
+});
+
+document.querySelectorAll('.suggest-row button[data-sym]').forEach(function(b) {
+  b.addEventListener('click', function() {
+    $('analystInput').value = b.dataset.sym;
+    analyze(b.dataset.sym);
+  });
+});
+
+// ===== URL PARAM SUPPORT =====
+function checkUrlParam() {
+  var params = new URLSearchParams(window.location.search);
+  var sym = params.get('symbol');
+  if (sym) {
+    $('analystInput').value = sym.toUpperCase();
+    analyze(sym.toUpperCase());
+  }
+}
+
+// ===== MOBILE GRID FIX =====
+function fixAnalystGrid() {
+  var g = document.querySelector('.analyst-grid');
+  if (!g) return;
+  if (window.innerWidth < 900) g.style.gridTemplateColumns = '1fr';
+  else g.style.gridTemplateColumns = '1fr 300px';
+}
+fixAnalystGrid();
+window.addEventListener('resize', fixAnalystGrid);
+
+// ===== BOOT =====
+document.addEventListener('DOMContentLoaded', function() {
+  renderCompareChips();
+  renderHistory();
+  checkUrlParam();
+});
+
+// In case DOMContentLoaded already fired
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  setTimeout(function() {
+    renderCompareChips();
+    renderHistory();
+    checkUrlParam();
+  }, 50);
+}
+</script>
+</body>
+</html>
