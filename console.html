@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Console — Swing Scout</title>
+<meta name="description" content="Run the 13-agent consensus engine on any NSE ticker." />
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="assets/style.css">
+
+<style>
+  .console-shell {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 24px;
+    padding: 32px 0 64px;
+  }
+  @media (max-width: 900px) {
+    .console-shell { grid-template-columns: 1fr; }
+  }
+  .console-panel {
+    position: sticky; top: 88px; align-self: start;
+  }
+  @media (max-width: 900px) {
+    .console-panel { position: static; }
+  }
+  .agent-stream {
+    display: grid; gap: 12px;
+  }
+  .agent-live {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+  .agent-live.show { opacity: 1; transform: translateY(0); }
+  .agent-live.verdict-VETO { border-left: 3px solid var(--coral); }
+  .agent-live.verdict-WARNS { border-left: 3px solid var(--amber); }
+  .agent-live.verdict-SUPPORTS { border-left: 3px solid var(--primary); }
+  .agent-live.verdict-NEUTRAL { border-left: 3px solid var(--faint); }
+  .thinking-dots { display: inline-flex; gap: 4px; align-items: center; }
+  .thinking-dots span {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--muted);
+    animation: bounce 1.2s infinite ease-in-out;
+  }
+  .thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .thinking-dots span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-4px); opacity: 1; }
+  }
+  .pipeline-mini {
+    display: grid; gap: 6px;
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .pipeline-mini .pipe-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; border-radius: 8px;
+    background: var(--surface-2);
+    font-size: 12px; color: var(--muted);
+    transition: all 0.3s ease;
+  }
+  .pipeline-mini .pipe-item.active {
+    background: var(--primary-soft); color: var(--primary);
+    font-weight: 600;
+  }
+  .pipeline-mini .pipe-item.done {
+    background: var(--primary-soft); color: var(--primary);
+  }
+  .pipe-num {
+    font-family: var(--font-mono); font-size: 11px; opacity: 0.8;
+  }
+  .result-card {
+    opacity: 0; transform: translateY(10px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .result-card.show { opacity: 1; transform: translateY(0); }
+  .ticker-suggest {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px;
+  }
+  .ticker-suggest button {
+    font-family: var(--font-mono); font-size: 11px;
+    padding: 4px 10px; border-radius: 999px;
+    background: var(--surface-2); color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .ticker-suggest button:hover {
+    background: var(--primary-soft); color: var(--primary);
+    border-color: var(--primary);
+  }
+</style>
+</head>
+
+<body data-page="console.html">
+
+<div id="nav-slot"></div>
+
+<!-- HEADER -->
+<section style="padding:48px 0 16px;">
+  <div class="container">
+    <div class="flex between center wrap gap-3 mb-4">
+      <div>
+        <p class="kicker mono" style="color:var(--primary); margin-bottom:6px;">// AGENT ORCHESTRATOR</p>
+        <h1 style="font-size:clamp(1.8rem, 5vw, 2.6rem);">Run a full audit on any NSE ticker.</h1>
+      </div>
+      <span class="demo-chip">Phase 1 · Demo Data</span>
+    </div>
+    <p class="muted" style="max-width:640px;">
+      Enter a symbol below. 13 agents will run sequentially — Technicals, Smart Money,
+      News, Risk, Critic, and more. The Orchestrator publishes the final consensus.
+      Anything that fails a hard rule is rejected outright.
+    </p>
+  </div>
+</section>
+
+<!-- CONSOLE SHELL -->
+<section class="container">
+  <div class="console-shell">
+
+    <!-- LEFT: CONTROL PANEL -->
+    <aside class="console-panel">
+      <div class="card mb-4">
+        <label class="field" style="margin-bottom:12px;">
+          <span>NSE Symbol</span>
+          <input type="text" id="tickerInput" class="input mono" placeholder="e.g. RELIANCE" autocapitalize="characters" />
+        </label>
+        <div class="ticker-suggest">
+          <button data-sym="RELIANCE">RELIANCE</button>
+          <button data-sym="TCS">TCS</button>
+          <button data-sym="CIPLA">CIPLA</button>
+          <button data-sym="TATAPOWER">TATAPOWER</button>
+          <button data-sym="KPITTECH">KPITTECH</button>
+        </div>
+        <div class="flex gap-2 mt-4">
+          <button id="runBtn" class="btn btn-primary" style="flex:1; justify-content:center;">Run Audit →</button>
+          <button id="surpriseBtn" class="btn btn-ghost btn-sm" title="Random pick">🎲</button>
+        </div>
+        <button id="resetBtn" class="btn btn-ghost btn-sm mt-2" style="width:100%; justify-content:center;">Reset</button>
+      </div>
+
+      <!-- PIPELINE MINI -->
+      <div class="card">
+        <div class="text-xs mono muted mb-3">// PIPELINE STATUS</div>
+        <div class="pipeline-mini" id="pipelineMini"></div>
+      </div>
+    </aside>
+
+    <!-- RIGHT: MAIN STREAM -->
+    <main>
+      <!-- EMPTY STATE -->
+      <div id="emptyState" class="card" style="text-align:center; padding:60px 32px;">
+        <div style="font-size:48px; margin-bottom:16px;">🎯</div>
+        <h3 class="mb-2">Ready when you are</h3>
+        <p class="muted text-sm" style="max-width:440px; margin:0 auto 20px;">
+          Enter an NSE symbol on the left and tap <strong>Run Audit</strong>.
+          The 13 agents will fire in sequence and publish their consensus.
+        </p>
+        <p class="text-xs muted" style="opacity:0.7;">
+          Tip: tap 🎲 for a random ticker from the demo set.
+        </p>
+      </div>
+
+      <!-- RUN STATE -->
+      <div id="runState" style="display:none;">
+        <div class="flex between center wrap gap-3 mb-4">
+          <div>
+            <div class="text-xs mono muted">// AUDITING</div>
+            <div class="mono bold" style="font-size:22px;" id="runningSymbol">—</div>
+          </div>
+          <div class="flex gap-2">
+            <span class="prov prov-live">● LIVE</span>
+            <span class="prov prov-delayed">DELAYED · 5m</span>
+          </div>
+        </div>
+
+        <!-- AGENT STREAM -->
+        <div class="agent-stream" id="agentStream"></div>
+
+        <!-- ORCHESTRATOR RESULT -->
+        <div id="resultSlot" style="margin-top:24px;"></div>
+      </div>
+    </main>
+
+  </div>
+</section>
+
+<div id="footer-slot"></div>
+
+<script src="assets/mock.js"></script>
+<script src="assets/app.js"></script>
+<script>
+  // ===== REJECTED SYMBOLS (for a bit of realism) =====
+  const REJECTED = {
+    'ADANIENT': 'On ASM list — hard rule exclusion',
+    'YESBANK': 'ATV below ₹10 Cr — liquidity fail',
+    'IRCTC': 'Earnings within window + 2 days',
+    'ZOMATO': 'Extended 2.1 ATR above 20-DMA',
+    'PAYTM': 'Reward:Risk below 1.5:1',
+    'IDEA': 'Circuit-locked — no entry possible'
+  };
+
+  // ===== HELPERS =====
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  // ===== PIPELINE MINI =====
+  function renderPipelineMini() {
+    const el = document.getElementById('pipelineMini');
+    el.innerHTML = MOCK.agents.map(a => `
+      <div class="pipe-item" data-agent="${a.id}">
+        <span class="pipe-num">${String(a.id).padStart(2,'0')}</span>
+        <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${a.name}</span>
+      </div>`).join('');
+  }
+
+  function setPipelineState(id, state) {
+    const el = document.querySelector(`.pipe-item[data-agent="${id}"]`);
+    if (!el) return;
+    el.classList.remove('active', 'done');
+    if (state) el.classList.add(state);
+  }
+
+  function resetPipeline() {
+    document.querySelectorAll('.pipe-item').forEach(el => el.classList.remove('active', 'done'));
+  }
+
+  // ===== AGENT CARD RENDER =====
+  function agentCardHTML(a) {
+    const bullets = a.bullets.map(b => `<li>• ${b}</li>`).join('');
+    return `
+      <div class="flex between center mb-2 flex-wrap gap-2">
+        <div class="flex center gap-3">
+          <span class="mono text-xs muted">${String(a.id).padStart(2,'0')}</span>
+          <strong style="font-family:var(--font-display); font-size:15px;">${a.name}</strong>
+        </div>
+        <div class="flex center gap-2">
+          ${verdictBadge(a.verdict)}
+          <span class="text-xs muted mono">${a.confidence}%</span>
+          <span class="prov prov-${a.prov}">${a.prov.toUpperCase()}</span>
+        </div>
+      </div>
+      <ul style="list-style:none; font-size:13px; color:var(--muted); display:grid; gap:3px; padding-left:24px;">
+        ${bullets}
+      </ul>`;
+  }
+
+  // ===== RUN AUDIT =====
+  async function runAudit(symbol) {
+    const sym = symbol.trim().toUpperCase();
+    if (!sym) return;
+
+    // Reset
+    resetPipeline();
+    document.getElementById('emptyState').style.display = 'none';
+    document.getElementById('runState').style.display = 'block';
+    document.getElementById('runningSymbol').textContent = sym;
+    document.getElementById('agentStream').innerHTML = '';
+    document.getElementById('resultSlot').innerHTML = '';
+
+    // Check if we have a mock pick for this symbol
+    const mockPick = MOCK.picks.find(p => p.symbol === sym);
+    const rejection = REJECTED[sym];
+
+    // Stream agents 1..13
+    for (const agent of MOCK.agents) {
+      setPipelineState(agent.id, 'active');
+
+      // Thinking bubble
+      const thinkingId = 'think-' + agent.id;
+      const stream = document.getElementById('agentStream');
+      const thinkingEl = document.createElement('div');
+      thinkingEl.className = 'agent-live show';
+      thinkingEl.id = thinkingId;
+      thinkingEl.innerHTML = `
+        <div class="flex between center">
+          <div class="flex center gap-3">
+            <span class="mono text-xs muted">${String(agent.id).padStart(2,'0')}</span>
+            <strong style="font-family:var(--font-display); font-size:15px;">${agent.name}</strong>
+          </div>
+          <span class="thinking-dots"><span></span><span></span><span></span></span>
+        </div>`;
+      stream.appendChild(thinkingEl);
+      thinkingEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+
+      await sleep(550 + Math.random() * 250);
+
+      // Replace with real verdict card
+      thinkingEl.outerHTML = `<div class="agent-live show verdict-${agent.verdict}">${agentCardHTML(agent)}</div>`;
+
+      setPipelineState(agent.id, 'done');
+      await sleep(120);
+    }
+
+    // Show result
+    await sleep(400);
+    renderResult(sym, mockPick, rejection);
+  }
+
+  // ===== RENDER RESULT =====
+  function renderResult(sym, pick, rejection) {
+    const slot = document.getElementById('resultSlot');
+
+    // ---- REJECTED CASE ----
+    if (!pick && rejection) {
+      slot.innerHTML = `
+        <div class="card result-card show" style="border-left:4px solid var(--coral);">
+          <div class="flex between center mb-3">
+            <span class="verdict v-veto">REJECTED</span>
+            <span class="prov prov-unavailable">EXCLUDED</span>
+          </div>
+          <h3 class="mb-2 mono">${sym}</h3>
+          <p class="muted text-sm mb-3">${rejection}</p>
+          <p class="text-xs muted">No pick emitted. This is a valid outcome — capital preservation beats opportunity.</p>
+        </div>`;
+      return;
+    }
+
+    // ---- UNKNOWN SYMBOL ----
+    if (!pick) {
+      slot.innerHTML = `
+        <div class="card result-card show">
+          <div class="flex between center mb-3">
+            <span class="verdict v-neutral">NO DATA</span>
+            <span class="demo-chip">Demo Set Only</span>
+          </div>
+          <h3 class="mb-2 mono">${sym}</h3>
+          <p class="muted text-sm mb-3">
+            This symbol isn't in the Phase 1 demo set. Try one of these to see the full pipeline:
+          </p>
+          <div class="ticker-suggest">
+            ${MOCK.picks.map(p => `<button data-sym="${p.symbol}">${p.symbol}</button>`).join('')}
+          </div>
+        </div>`;
+      slot.querySelectorAll('button[data-sym]').forEach(b => {
+        b.onclick = () => { document.getElementById('tickerInput').value = b.dataset.sym; runAudit(b.dataset.sym); window.scrollTo({top:200, behavior:'smooth'}); };
+      });
+      return;
+    }
+
+    // ---- FULL PICK RESULT ----
+    const groupCls = pick.group === 'CORE' ? 'v-supports' : (pick.group === 'EXPLORER' ? 'v-neutral' : 'v-warns');
+    const orchestratorBullets = [
+      `Consensus: ${pick.score}/100`,
+      `Setup: ${pick.setup}`,
+      `Reward:Risk ${pick.rr}:1`,
+      `Critic: ${pick.critic}`
+    ];
+
+    slot.innerHTML = `
+      <div class="card result-card show" style="border-left:4px solid var(--primary); padding:0; overflow:hidden;">
+        <!-- ORCHESTRATOR HEADER -->
+        <div style="padding:20px 22px; background:var(--primary-soft); border-bottom:1px solid var(--border);">
+          <div class="flex between center wrap gap-3">
+            <div class="flex center gap-3">
+              <span class="mono text-xs">13</span>
+              <strong style="font-family:var(--font-display); font-size:16px;">Orchestrator</strong>
+            </div>
+            <div class="flex center gap-2">
+              ${verdictBadge('SUPPORTS')}
+              <span class="score-pill">${pick.score}/100</span>
+            </div>
+          </div>
+          <ul style="list-style:none; margin-top:12px; font-size:13px; color:var(--ink-soft); display:grid; gap:4px; padding-left:24px;">
+            ${orchestratorBullets.map(b => `<li>• ${b}</li>`).join('')}
+          </ul>
+        </div>
+
+        <!-- FINAL PICK -->
+        <div style="padding:24px;">
+          <div class="flex between center mb-4 wrap gap-3">
+            <div class="flex center gap-3">
+              <span class="verdict ${groupCls}">${pick.group}</span>
+              ${pick.fresh ? '<span class="prov prov-live">FRESH</span>' : '<span class="prov prov-reference">REPEAT</span>'}
+              <span class="verdict ${pick.confidence === 'HIGH' ? 'v-supports' : 'v-warns'}">${pick.confidence}</span>
+            </div>
+            <span class="demo-chip">Demo Data</span>
+          </div>
+
+          <div class="flex between center mb-4 wrap gap-3">
+            <div>
+              <div class="mono bold" style="font-size:24px;">${pick.symbol}</div>
+              <div class="text-sm muted">${pick.company} · ${pick.sector}</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="mono bold" style="font-size:20px;">₹${pick.price.toLocaleString('en-IN')}</div>
+              <div class="text-sm" style="color:var(--primary);">${pick.change}</div>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px; padding:16px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
+            <div>
+              <div class="text-xs muted">Entry zone</div>
+              <div class="mono bold">${pick.entryZone[0]}–${pick.entryZone[1]}</div>
+            </div>
+            <div>
+              <div class="text-xs muted">Stop</div>
+              <div class="mono bold" style="color:var(--coral);">${pick.stop}</div>
+            </div>
+            <div>
+              <div class="text-xs muted">T1 / T2</div>
+              <div class="mono bold" style="color:var(--primary);">${pick.t1} / ${pick.t2}</div>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px; padding:14px 0;">
+            <div>
+              <div class="text-xs muted">Reward:Risk</div>
+              <div class="mono bold">${pick.rr} : 1</div>
+            </div>
+            <div>
+              <div class="text-xs muted">Quantity</div>
+              <div class="mono bold">${pick.qty} shares</div>
+            </div>
+            <div>
+              <div class="text-xs muted">Capital</div>
+              <div class="mono bold">₹${pick.capital.toLocaleString('en-IN')}</div>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:14px; padding-bottom:14px;">
+            <div>
+              <div class="text-xs muted">Rupees at risk</div>
+              <div class="mono bold">₹${pick.riskInr}</div>
+            </div>
+            <div>
+              <div class="text-xs muted">Est. charges</div>
+              <div class="mono bold">₹${pick.charges}</div>
+            </div>
+            <div>
+              <div class="text-xs muted">Exit deadline</div>
+              <div class="mono bold">${pick.exitDeadline}</div>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <div class="text-xs muted mb-2">// WHY THIS PICK</div>
+            <ul style="list-style:none; font-size:13px; display:grid; gap:4px;">
+              ${pick.why.map(w => `<li>• ${w}</li>`).join('')}
+            </ul>
+          </div>
+
+          <div style="padding:14px; background:var(--amber-soft); border-radius:10px; font-size:13px;">
+            <div class="bold mb-1">Critic's counter-case</div>
+            <div class="muted">${pick.critic}</div>
+            <div class="text-xs muted mt-2"><strong>Invalidates if:</strong> ${pick.invalidates}</div>
+          </div>
+
+          ${pick.relaxed ? `<div class="mt-3" style="padding:12px; background:var(--surface-2); border-radius:10px; font-size:13px;"><strong>Relaxed rule:</strong> ${pick.relaxed}</div>` : ''}
+
+          <div class="flex wrap gap-2 mt-6">
+            <a href="desk.html" class="btn btn-primary btn-sm">Save to Desk →</a>
+            <a href="analyst.html?symbol=${pick.symbol}" class="btn btn-ghost btn-sm">Full Analyst view</a>
+            <a href="chat.html" target="_blank" class="btn btn-ghost btn-sm">Ask Scout Chat</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- REJECTED LIST -->
+      <div class="card mt-4">
+        <div class="text-xs mono muted mb-3">// REJECTED DURING SCREENING (Demo)</div>
+        <div class="grid grid-2">
+          ${Object.entries(REJECTED).slice(0,6).map(([sym, reason]) => `
+            <div class="flex between center text-sm" style="padding:8px 0; border-bottom:1px solid var(--border);">
+              <span class="mono bold">${sym}</span>
+              <span class="muted text-xs" style="text-align:right;">${reason}</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  // ===== EVENTS =====
+  document.addEventListener('DOMContentLoaded', () => {
+    renderPipelineMini();
+
+    const input = document.getElementById('tickerInput');
+    const runBtn = document.getElementById('runBtn');
+    const surpriseBtn = document.getElementById('surpriseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    runBtn.onclick = () => runAudit(input.value);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') runAudit(input.value); });
+
+    surpriseBtn.onclick = () => {
+      const s = MOCK.picks[Math.floor(Math.random() * MOCK.picks.length)].symbol;
+      input.value = s;
+      runAudit(s);
+      window.scrollTo({ top: 200, behavior: 'smooth' });
+    };
+
+    resetBtn.onclick = () => {
+      input.value = '';
+      document.getElementById('emptyState').style.display = 'block';
+      document.getElementById('runState').style.display = 'none';
+      document.getElementById('agentStream').innerHTML = '';
+      document.getElementById('resultSlot').innerHTML = '';
+      resetPipeline();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    document.querySelectorAll('.ticker-suggest button').forEach(b => {
+      b.onclick = () => { input.value = b.dataset.sym; runAudit(b.dataset.sym); };
+    });
+  });
+</script>
+
+</body>
+</html>
