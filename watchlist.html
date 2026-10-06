@@ -265,3 +265,231 @@
 </div>
 
 <div id="footer-slot"></div>
+  
+<script src="assets/mock.js"></script>
+<script src="assets/app.js"></script>
+<script>
+var $ = function(id) { return document.getElementById(id); };
+
+// ===== WATCHLIST STORAGE =====
+var watchlist = Store.get('watchlist', []);
+var alerts = Store.get('alerts', []);
+
+// ===== HELPERS =====
+function findPickData(symbol) {
+  return MOCK.picks.find(function(p) { return p.symbol === symbol; }) || null;
+}
+
+function isFresh(symbol) {
+  var p = findPickData(symbol);
+  return p && p.fresh;
+}
+
+function getAlertsFor(symbol) {
+  return alerts.filter(function(a) { return a.symbol === symbol; });
+}
+
+// ===== RENDER WATCHLIST =====
+function renderWatchlist(filter) {
+  filter = (filter || '').toUpperCase();
+  var grid = $('wlGrid');
+  var empty = $('wlEmpty');
+  var list = watchlist;
+  if (filter) {
+    list = watchlist.filter(function(w) {
+      return w.symbol.indexOf(filter) !== -1 ||
+             (w.note || '').toUpperCase().indexOf(filter) !== -1;
+    });
+  }
+  if (!list.length) {
+    grid.innerHTML = '';
+    empty.style.display = 'block';
+    $('wlCount').textContent = '(0)';
+    updateStats();
+    return;
+  }
+  empty.style.display = 'none';
+  $('wlCount').textContent = '(' + list.length + ')';
+  grid.innerHTML = list.map(function(w) {
+    return renderWatchCard(w);
+  }).join('');
+
+  // Attach button listeners
+  grid.querySelectorAll('[data-act]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var act = btn.dataset.act;
+      var sym = btn.dataset.sym;
+      if (act === 'note') editNote(sym);
+      else if (act === 'alert') addAlert(sym);
+      else if (act === 'remove') removeFromWatchlist(sym);
+    });
+  });
+  updateStats();
+}
+
+function renderWatchCard(w) {
+  var pick = findPickData(w.symbol);
+  var fresh = isFresh(w.symbol);
+  var alertCount = getAlertsFor(w.symbol).length;
+
+  var price = pick ? pick.price : (Math.random() * 2000 + 200).toFixed(2);
+  var chg = pick ? pick.change : ((Math.random() * 3 - 1.5).toFixed(2) + '%');
+  var isUp = chg.indexOf('+') === 0 || parseFloat(chg) > 0;
+
+  var groupTag = '';
+  if (pick) {
+    var cls = pick.group === 'CORE' ? 'v-supports' :
+              (pick.group === 'EXPLORER' ? 'v-neutral' : 'v-warns');
+    groupTag = '<span class="verdict ' + cls + '">' + pick.group + '</span>';
+  }
+
+  var entryV = pick ? pick.entryZone[0] + '–' + pick.entryZone[1] : '—';
+  var stopV = pick ? pick.stop : '—';
+  var t1V = pick ? pick.t1 : '—';
+
+  var alertBadge = alertCount
+    ? '<span class="verdict v-warns">' + alertCount + ' alert' + (alertCount > 1 ? 's' : '') + '</span>'
+    : '';
+
+  var noteHTML = w.note
+    ? '<div class="wl-notes">' + escapeHtml(w.note) + '</div>'
+    : '<div class="wl-notes empty">No note yet — tap Note to add one.</div>';
+
+  return '' +
+    '<div class="wl-card">' +
+      '<div class="wl-head">' +
+        '<div>' +
+          '<div class="wl-symbol">' + w.symbol + '</div>' +
+          (pick ? '<div class="wl-company">' + pick.company + '</div>' : '<div class="wl-company">Custom entry</div>') +
+        '</div>' +
+        '<div class="wl-price">' +
+          '<div class="val">₹' + Number(price).toLocaleString('en-IN') + '</div>' +
+          '<div class="chg" style="color: ' + (isUp ? 'var(--primary)' : 'var(--coral)') + '">' + chg + '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="flex wrap gap-2">' +
+        (fresh ? '<span class="prov prov-live">FRESH</span>' : '<span class="prov prov-reference">SAVED</span>') +
+        groupTag +
+        alertBadge +
+      '</div>' +
+      '<div class="wl-meta">' +
+        '<div><div class="lbl">Entry</div><div class="v">' + entryV + '</div></div>' +
+        '<div><div class="lbl">Stop</div><div class="v" style="color:var(--coral)">' + stopV + '</div></div>' +
+        '<div><div class="lbl">T1</div><div class="v" style="color:var(--primary)">' + t1V + '</div></div>' +
+      '</div>' +
+      noteHTML +
+      '<div class="wl-actions">' +
+        '<button class="btn btn-ghost btn-sm" data-act="note" data-sym="' + w.symbol + '">📝 Note</button>' +
+        '<button class="btn btn-ghost btn-sm" data-act="alert" data-sym="' + w.symbol + '">🔔 Alert</button>' +
+        '<button class="btn btn-ghost btn-sm" data-act="remove" data-sym="' + w.symbol + '" style="color:var(--coral)">✕ Remove</button>' +
+      '</div>' +
+    '</div>';
+}
+
+// ===== ALERTS =====
+function renderAlerts() {
+  var list = $('alertsList');
+  var empty = $('alertsEmpty');
+  if (!alerts.length) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    updateStats();
+    return;
+  }
+  empty.style.display = 'none';
+  list.innerHTML = alerts.map(function(a, i) {
+    var cls = a.status === 'active' ? 'alert-active' : 'alert-warning';
+    return '' +
+      '<div class="alert-item ' + cls + '">' +
+        '<div>' +
+          '<div class="sym">' + a.symbol + '</div>' +
+          '<div class="cond">' + a.condition + '</div>' +
+        '</div>' +
+        '<button data-rm-alert="' + i + '" style="color:var(--coral);background:none;border:none;cursor:pointer;font-size:16px;">×</button>' +
+      '</div>';
+  }).join('');
+
+  list.querySelectorAll('[data-rm-alert]').forEach(function(b) {
+    b.addEventListener('click', function() {
+      alerts.splice(+b.dataset.rmAlert, 1);
+      Store.set('alerts', alerts);
+      renderAlerts();
+    });
+  });
+  updateStats();
+}
+
+function addAlert(symbol) {
+  var price = prompt('Alert when ' + symbol + ' crosses what price? (₹)');
+  if (!price) return;
+  var num = parseFloat(price);
+  if (isNaN(num)) { alert('Invalid price'); return; }
+  var current = findPickData(symbol);
+  var cmp = current ? current.price : num;
+  var direction = num > cmp ? 'above' : 'below';
+  alerts.push({
+    symbol: symbol,
+    condition: 'Price crosses ' + direction + ' ₹' + num,
+    target: num,
+    direction: direction,
+    status: 'active',
+    created: Date.now()
+  });
+  Store.set('alerts', alerts);
+  renderAlerts();
+  renderWatchlist();
+}
+
+// ===== NOTES =====
+function editNote(symbol) {
+  var w = watchlist.find(function(x) { return x.symbol === symbol; });
+  if (!w) return;
+  var note = prompt('Note for ' + symbol + ':', w.note || '');
+  if (note === null) return;
+  w.note = note.trim();
+  Store.set('watchlist', watchlist);
+  renderWatchlist();
+}
+
+// ===== ADD / REMOVE =====
+function addToWatchlist(symbol, note) {
+  symbol = (symbol || '').toUpperCase().trim();
+  if (!symbol) return;
+  if (watchlist.find(function(w) { return w.symbol === symbol; })) {
+    alert(symbol + ' is already in your watchlist.');
+    return;
+  }
+  watchlist.unshift({
+    symbol: symbol,
+    note: note || '',
+    added: Date.now()
+  });
+  Store.set('watchlist', watchlist);
+  renderWatchlist();
+}
+
+function removeFromWatchlist(symbol) {
+  if (!confirm('Remove ' + symbol + ' from watchlist?')) return;
+  watchlist = watchlist.filter(function(w) { return w.symbol !== symbol; });
+  Store.set('watchlist', watchlist);
+  // Also remove alerts for this symbol
+  alerts = alerts.filter(function(a) { return a.symbol !== symbol; });
+  Store.set('alerts', alerts);
+  renderWatchlist();
+  renderAlerts();
+}
+
+// ===== STATS =====
+function updateStats() {
+  $('statTotal').textContent = watchlist.length;
+  $('statFresh').textContent = watchlist.filter(function(w) { return isFresh(w.symbol); }).length;
+  $('statAlerts').textContent = alerts.length;
+  $('statNotes').textContent = watchlist.filter(function(w) { return w.note && w.note.length; }).length;
+}
+
+// ===== UTILITY =====
+function escapeHtml(s) {
+  var d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
