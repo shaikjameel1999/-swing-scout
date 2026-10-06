@@ -377,3 +377,87 @@ function quickJournal(i) {
   $('jNotes').value = '';
   $('journalModal').style.display = 'flex';
 }
+  
+$('addJournalBtn').addEventListener('click', function() {
+  ['jSymbol','jSetup','jEntry','jExit','jStop','jQty','jNotes'].forEach(function(id) { $(id).value = ''; });
+  $('journalModal').style.display = 'flex';
+});
+$('jCancel').addEventListener('click', function() { $('journalModal').style.display = 'none'; });
+$('jSave').addEventListener('click', function() {
+  var sym = $('jSymbol').value.toUpperCase().trim();
+  var entry = +$('jEntry').value;
+  var exit = +$('jExit').value;
+  var stop = +$('jStop').value;
+  if (!sym || !entry || !exit || !stop) { alert('Fill symbol, entry, exit, stop'); return; }
+  var r = r2((exit - entry) / (entry - stop));
+  addJournalEntry({ symbol: sym, setup: $('jSetup').value, entry: entry, exit: exit, stop: stop, qty: +$('jQty').value || 0, r: r, notes: $('jNotes').value });
+  $('journalModal').style.display = 'none';
+});
+
+function renderPerformance() {
+  var n = journal.length;
+  if (!n) {
+    ['pWin','pAvgR','pExp','pPf','pBest','pWorst'].forEach(function(id) { $(id).textContent = '—'; });
+    $('pTotal').textContent = '0';
+    $('curveLine').setAttribute('points', '');
+    return;
+  }
+  var wins = journal.filter(function(j) { return j.r > 0; });
+  var losses = journal.filter(function(j) { return j.r <= 0; });
+  var winRate = r2((wins.length / n) * 100);
+  var avgR = r2(journal.reduce(function(s, j) { return s + j.r; }, 0) / n);
+  var grossWin = wins.reduce(function(s, j) { return s + j.r; }, 0);
+  var grossLoss = Math.abs(losses.reduce(function(s, j) { return s + j.r; }, 0));
+  var pf = grossLoss ? r2(grossWin / grossLoss) : '∞';
+  var best = Math.max.apply(null, journal.map(function(j) { return j.r; }));
+  var worst = Math.min.apply(null, journal.map(function(j) { return j.r; }));
+
+  var cum = 0;
+  var arr = journal.slice().reverse();
+  var pts = arr.map(function(j, i) {
+    cum += j.r;
+    var x = (i / Math.max(1, arr.length - 1)) * 400;
+    var y = 90 - (cum * 12);
+    return x + ',' + Math.max(10, Math.min(170, y));
+  }).join(' ');
+  $('curveLine').setAttribute('points', pts);
+
+  $('pTotal').textContent = n;
+  $('pWin').textContent = winRate + '%';
+  $('pAvgR').textContent = avgR + 'R';
+  $('pExp').textContent = avgR + 'R';
+  $('pPf').textContent = pf;
+  $('pBest').textContent = '+' + best + 'R';
+  $('pWorst').textContent = worst + 'R';
+}
+
+function calcPlanner() {
+  var start = +$('plStart').value || 15000;
+  var top = +$('plTop').value || 0;
+  var target = +$('plTarget').value || 100000;
+  var edges = [['2','plE2','plE2m'], ['4','plE4','plE4m'], ['7','plE7','plE7m']];
+  edges.forEach(function(e) {
+    var monthly = +e[0] / 100;
+    var bal = start;
+    var months = 0;
+    while (bal < target && months < 240) { bal = bal * (1 + monthly) + top; months++; }
+    var yrs = (months / 12).toFixed(1);
+    $(e[1]).textContent = months < 240 ? months + ' mo' : '—';
+    $(e[2]).textContent = months < 240 ? '~' + yrs + ' yrs @ ' + e[0] + '%' : 'Not in 20y';
+  });
+}
+['plStart','plTop','plTarget'].forEach(function(id) { $(id).addEventListener('input', calcPlanner); });
+
+$('setPaper').addEventListener('click', function() { settings.mode = 'paper'; Store.set('settings', settings); updateModeBadge(); });
+$('setLive').addEventListener('click', function() { alert('Live mode locked until 30+ paper trades with positive expectancy.'); });
+$('saveSettings').addEventListener('click', saveSettings);
+$('resetSettings').addEventListener('click', resetSettings);
+
+loadSettings();
+renderToday();
+renderOpen();
+renderJournal();
+calcPlanner();
+</script>
+</body>
+</html>
