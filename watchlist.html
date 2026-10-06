@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Watchlist — Swing Scout</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.wl-shell {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+  padding: 32px 0 64px;
+}
+@media (max-width: 900px) { .wl-shell { grid-template-columns: 1fr; } }
+
+.wl-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: all 0.2s ease;
+}
+.wl-card:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+  box-shadow: var(--shadow-md);
+}
+.wl-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.wl-symbol {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.1;
+}
+.wl-company {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.wl-price {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+.wl-price .val { font-weight: 700; font-size: 16px; }
+.wl-price .chg { font-size: 12px; }
+
+.wl-meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+}
+.wl-meta > div .lbl {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  font-weight: 600;
+}
+.wl-meta > div .v {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.wl-notes {
+  font-size: 13px;
+  color: var(--ink-soft);
+  background: var(--surface-2);
+  padding: 10px 12px;
+  border-radius: 10px;
+  min-height: 40px;
+}
+.wl-notes.empty { color: var(--muted); font-style: italic; }
+
+.wl-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.wl-actions .btn { font-size: 12px; padding: 6px 12px; }
+
+.wl-empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--muted);
+}
+.wl-empty .icon { font-size: 44px; margin-bottom: 12px; }
+
+.alerts-panel {
+  display: grid;
+  gap: 8px;
+}
+.alert-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 13px;
+}
+.alert-item .sym {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 12px;
+}
+.alert-item .cond { font-size: 11px; color: var(--muted); }
+
+.alert-active {
+  border-left: 3px solid var(--primary);
+  background: var(--primary-soft);
+}
+.alert-warning {
+  border-left: 3px solid var(--amber);
+  background: var(--amber-soft);
+}
+
+.side-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 14px;
+}
+.side-tab {
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+.side-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+.side-panel { display: none; }
+.side-panel.active { display: block; }
+</style>
+</head>
+
+<body data-page="watchlist.html">
+
+<div id="nav-slot"></div>
+
+<!-- HEADER -->
+<section style="padding: 48px 0 12px;">
+  <div class="container">
+    <div class="flex between center wrap gap-3 mb-4">
+      <div>
+        <p class="kicker mono" style="color: var(--primary); margin-bottom: 6px;">// WATCHLIST</p>
+        <h1 style="font-size: clamp(1.8rem, 5vw, 2.6rem);">Your saved research.</h1>
+      </div>
+      <div class="flex gap-2">
+        <span class="demo-chip">Phase 1 · Local</span>
+        <button class="btn btn-ghost btn-sm" id="clearAllBtn">Clear all</button>
+      </div>
+    </div>
+    <p class="muted" style="max-width: 640px;">
+      Tickers you've saved from the Console, Analyst, and Desk. Notes and alerts
+      stay in this browser.
+    </p>
+  </div>
+</section>
+
+<!-- MAIN SHELL -->
+<section class="container">
+  <div class="wl-shell">
+
+    <!-- LEFT: WATCHLIST GRID -->
+    <main>
+      <div class="flex between center mb-4">
+        <h3>Saved tickers <span class="muted text-sm" id="wlCount">(0)</span></h3>
+        <button class="btn btn-ghost btn-sm" id="addManualBtn">+ Add ticker</button>
+      </div>
+      <div id="wlGrid" class="grid grid-2" style="gap: 14px;"></div>
+      <div id="wlEmpty" class="card wl-empty">
+        <div class="icon">⭐</div>
+        <h3 class="mb-2">No tickers saved yet</h3>
+        <p class="text-sm muted mb-4">Save from Console or Analyst to build your watchlist.</p>
+        <div class="flex gap-2" style="justify-content: center; flex-wrap: wrap;">
+          <a href="console.html" class="btn btn-primary btn-sm">Open Console</a>
+          <a href="analyst.html" class="btn btn-ghost btn-sm">Open Analyst</a>
+        </div>
+      </div>
+    </main>
+
+    <!-- RIGHT: SIDEBAR -->
+    <aside>
+      <div class="card">
+        <div class="side-tabs">
+          <button class="side-tab active" data-side="alerts">Alerts</button>
+          <button class="side-tab" data-side="compare">Compare</button>
+        </div>
+
+        <div class="side-panel active" data-panel="alerts">
+          <div class="alerts-panel" id="alertsList"></div>
+          <div id="alertsEmpty" class="text-xs muted" style="padding: 20px 0; text-align: center;">
+            No alerts set. Tap "Alert" on any ticker.
+          </div>
+        </div>
+
+        <div class="side-panel" data-panel="compare">
+          <div id="compareList" style="display: grid; gap: 8px;"></div>
+          <div id="compareEmpty" class="text-xs muted" style="padding: 20px 0; text-align: center;">
+            No tickers to compare. Add at least 2 from Analyst.
+          </div>
+        </div>
+      </div>
+
+      <div class="card mt-4">
+        <div class="text-xs mono muted mb-2">// QUICK STATS</div>
+        <div class="flex between text-sm mb-2">
+          <span class="muted">Total saved</span>
+          <span class="mono bold" id="statTotal">0</span>
+        </div>
+        <div class="flex between text-sm mb-2">
+          <span class="muted">Fresh picks</span>
+          <span class="mono bold" id="statFresh">0</span>
+        </div>
+        <div class="flex between text-sm mb-2">
+          <span class="muted">Alerts active</span>
+          <span class="mono bold" id="statAlerts">0</span>
+        </div>
+        <div class="flex between text-sm">
+          <span class="muted">Notes added</span>
+          <span class="mono bold" id="statNotes">0</span>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+</section>
+
+<!-- ADD TICKER MODAL -->
+<div id="wlModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; padding: 20px;">
+  <div class="card" style="max-width: 440px; width: 100%;">
+    <h3 class="mb-4" id="wlModalTitle">Add ticker</h3>
+    <label class="field"><span>NSE Symbol</span>
+      <input type="text" class="input mono" id="wlModalSymbol" placeholder="e.g. RELIANCE" autocapitalize="characters" />
+    </label>
+    <label class="field"><span>Note (optional)</span>
+      <textarea class="textarea" id="wlModalNote" rows="3" placeholder="Why are you watching this?"></textarea>
+    </label>
+    <div class="flex gap-2 mt-4">
+      <button class="btn btn-primary" id="wlModalSave" style="flex: 1; justify-content: center;">Save</button>
+      <button class="btn btn-ghost" id="wlModalCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="footer-slot"></div>
