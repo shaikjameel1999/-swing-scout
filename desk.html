@@ -202,3 +202,178 @@
 </div>
 
 <div id="footer-slot"></div>
+
+  
+<script src="assets/mock.js"></script>
+<script src="assets/app.js"></script>
+<script>
+var $ = function(id) { return document.getElementById(id); };
+var r2 = function(n) { return Math.round(n * 100) / 100; };
+
+var DEFAULT_SETTINGS = { mode:'paper', capital:15000, risk:1, maxPos:3, maxRisk:3, maxTrades:2, charges:40 };
+var settings = Object.assign({}, DEFAULT_SETTINGS, Store.get('settings') || {});
+
+function loadSettings() {
+  $('setCapital').value = settings.capital;
+  $('setRisk').value = settings.risk;
+  $('setMaxPos').value = settings.maxPos;
+  $('setMaxRisk').value = settings.maxRisk;
+  $('setMaxTrades').value = settings.maxTrades;
+  $('setCharges').value = settings.charges;
+  updateModeBadge();
+}
+function saveSettings() {
+  settings.capital = +$('setCapital').value;
+  settings.risk = +$('setRisk').value;
+  settings.maxPos = +$('setMaxPos').value;
+  settings.maxRisk = +$('setMaxRisk').value;
+  settings.maxTrades = +$('setMaxTrades').value;
+  settings.charges = +$('setCharges').value;
+  Store.set('settings', settings);
+  $('settingsSaved').style.opacity = '1';
+  setTimeout(function() { $('settingsSaved').style.opacity = '0'; }, 1500);
+}
+function resetSettings() {
+  settings = Object.assign({}, DEFAULT_SETTINGS);
+  Store.set('settings', settings);
+  loadSettings();
+}
+function updateModeBadge() {
+  var b = $('modeBadge');
+  if (settings.mode === 'paper') { b.className = 'mode-badge mode-paper'; b.textContent = '📝 Paper Mode'; }
+  else { b.className = 'mode-badge mode-live'; b.textContent = '● Live Mode'; }
+}
+
+document.querySelectorAll('.tab').forEach(function(t) {
+  t.addEventListener('click', function() {
+    document.querySelectorAll('.tab').forEach(function(x) { x.classList.remove('active'); });
+    document.querySelectorAll('.tab-panel').forEach(function(x) { x.classList.remove('active'); });
+    t.classList.add('active');
+    document.querySelector('.tab-panel[data-panel="' + t.dataset.tab + '"]').classList.add('active');
+  });
+});
+
+var todayPicks = Store.get('todayPicks', []);
+function renderToday() {
+  var g = $('todayGrid');
+  var e = $('todayEmpty');
+  if (!todayPicks.length) { g.innerHTML = ''; e.style.display = 'block'; return; }
+  e.style.display = 'none';
+  var html = '';
+  todayPicks.forEach(function(p, i) {
+    html += '<div class="card mb-4">';
+    html += '<div class="flex between center mb-3"><div class="flex gap-2" style="align-items:center"><span class="mono bold" style="font-size:18px">' + p.symbol + '</span><span class="verdict ' + (p.group === 'CORE' ? 'v-supports' : 'v-warns') + '">' + p.group + '</span></div><span class="score-pill">' + p.score + '</span></div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;font-size:13px;padding:12px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)">';
+    html += '<div><div class="text-xs muted">Entry</div><div class="mono bold">' + p.entryZone[0] + '–' + p.entryZone[1] + '</div></div>';
+    html += '<div><div class="text-xs muted">Stop</div><div class="mono bold" style="color:var(--coral)">' + p.stop + '</div></div>';
+    html += '<div><div class="text-xs muted">T1</div><div class="mono bold" style="color:var(--primary)">' + p.t1 + '</div></div>';
+    html += '</div>';
+    html += '<div class="flex between mt-3 text-sm"><span class="muted">Risk ₹' + p.riskInr + '</span><span class="muted">R:R ' + p.rr + ':1</span></div>';
+    html += '<div class="flex gap-2 mt-4"><button class="btn btn-primary btn-sm" data-add="' + i + '">Add to Open</button><button class="btn btn-ghost btn-sm" data-jn="' + i + '">Journal</button></div>';
+    html += '</div>';
+  });
+  g.innerHTML = html;
+  g.querySelectorAll('[data-add]').forEach(function(b) { b.addEventListener('click', function() { addOpenTrade(+b.dataset.add); }); });
+  g.querySelectorAll('[data-jn]').forEach(function(b) { b.addEventListener('click', function() { quickJournal(+b.dataset.jn); }); });
+}
+
+$('loadDemoBtn').addEventListener('click', function() {
+  todayPicks = MOCK.picks.map(function(p) { return Object.assign({}, p); });
+  Store.set('todayPicks', todayPicks);
+  renderToday();
+});
+
+var openTrades = Store.get('openTrades', []);
+function renderOpen() {
+  var g = $('openGrid');
+  var e = $('openEmpty');
+  if (!openTrades.length) { g.innerHTML = ''; e.style.display = 'block'; return; }
+  e.style.display = 'none';
+  var html = '';
+  openTrades.forEach(function(t, i) {
+    var cmp = +(t.entry * (1 + (Math.random() * 0.02 - 0.01))).toFixed(2);
+    var pnl = r2((cmp - t.entry) * t.qty - settings.charges);
+    var pnlPct = r2(((cmp - t.entry) / t.entry) * 100);
+    var cls = pnl >= 0 ? 'r-pos' : 'r-neg';
+    html += '<div class="card mb-3">';
+    html += '<div class="flex between center mb-2"><div class="flex gap-2" style="align-items:center"><span class="mono bold" style="font-size:17px">' + t.symbol + '</span><span class="verdict v-neutral">' + t.setup + '</span></div><span class="verdict ' + (pnl >= 0 ? 'v-supports' : 'v-veto') + '">' + (pnl >= 0 ? 'PROFIT' : 'LOSS') + '</span></div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:12px;padding-top:10px;border-top:1px solid var(--border)">';
+    html += '<div><div class="muted">Entry</div><div class="mono">' + t.entry + '</div></div>';
+    html += '<div><div class="muted">CMP</div><div class="mono">' + cmp + '</div></div>';
+    html += '<div><div class="muted">Qty</div><div class="mono">' + t.qty + '</div></div>';
+    html += '<div><div class="muted">P&L</div><div class="mono ' + cls + '">₹' + pnl + '</div></div>';
+    html += '</div>';
+    html += '<div class="flex between mt-3 text-xs"><span class="muted">' + (pnlPct >= 0 ? '+' : '') + pnlPct + '%</span><button class="btn btn-ghost btn-sm" data-close="' + i + '">Close & Journal</button></div>';
+    html += '</div>';
+  });
+  g.innerHTML = html;
+  g.querySelectorAll('[data-close]').forEach(function(b) { b.addEventListener('click', function() { closeTrade(+b.dataset.close); }); });
+}
+
+function addOpenTrade(i) {
+  var p = todayPicks[i];
+  if (!p) return;
+  openTrades.push({ symbol: p.symbol, setup: p.setup, entry: p.entryZone[0], stop: p.stop, qty: p.qty, t1: p.t1, t2: p.t2, added: Date.now() });
+  Store.set('openTrades', openTrades);
+  renderOpen();
+  document.querySelector('.tab[data-tab="open"]').click();
+}
+
+function closeTrade(i) {
+  var t = openTrades[i];
+  var exitPrice = +(t.entry * (1 + (Math.random() * 0.04 - 0.02))).toFixed(2);
+  var rMult = r2((exitPrice - t.entry) / (t.entry - t.stop));
+  addJournalEntry({ symbol: t.symbol, setup: t.setup, entry: t.entry, exit: exitPrice, stop: t.stop, qty: t.qty, r: rMult, notes: 'Closed from Open Trades' });
+  openTrades.splice(i, 1);
+  Store.set('openTrades', openTrades);
+  renderOpen();
+}
+
+$('refreshPnL').addEventListener('click', renderOpen);
+
+var journal = Store.get('journal', []);
+function renderJournal() {
+  var l = $('journalList');
+  var e = $('journalEmpty');
+  if (!journal.length) { l.innerHTML = ''; e.style.display = 'block'; return; }
+  e.style.display = 'none';
+  var html = '';
+  journal.forEach(function(j, i) {
+    html += '<div class="journal-row">';
+    html += '<div class="mono bold">' + j.symbol + '</div>';
+    html += '<div><div>' + j.setup + '</div><div class="text-xs muted">' + (j.notes || '') + '</div></div>';
+    html += '<div class="mono" style="text-align:right">' + j.entry + '</div>';
+    html += '<div class="mono" style="text-align:right">' + j.exit + '</div>';
+    html += '<div class="' + (j.r >= 0 ? 'r-pos' : 'r-neg') + '" style="text-align:right">' + (j.r >= 0 ? '+' : '') + j.r + 'R</div>';
+    html += '<button data-del="' + i + '">×</button>';
+    html += '</div>';
+  });
+  l.innerHTML = html;
+  l.querySelectorAll('[data-del]').forEach(function(b) { b.addEventListener('click', function() { delJournal(+b.dataset.del); }); });
+  renderPerformance();
+}
+
+function delJournal(i) {
+  journal.splice(i, 1);
+  Store.set('journal', journal);
+  renderJournal();
+}
+
+function addJournalEntry(j) {
+  journal.unshift(j);
+  Store.set('journal', journal);
+  renderJournal();
+}
+
+function quickJournal(i) {
+  var p = todayPicks[i];
+  if (!p) return;
+  $('jSymbol').value = p.symbol;
+  $('jSetup').value = p.setup;
+  $('jEntry').value = p.entryZone[0];
+  $('jStop').value = p.stop;
+  $('jQty').value = p.qty;
+  $('jExit').value = '';
+  $('jNotes').value = '';
+  $('journalModal').style.display = 'flex';
+}
