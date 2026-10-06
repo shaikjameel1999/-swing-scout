@@ -493,3 +493,115 @@ function escapeHtml(s) {
   d.textContent = s;
   return d.innerHTML;
 }
+  
+// ===== COMPARE PANEL =====
+function renderComparePanel() {
+  var compareList = Store.get('compareList', []);
+  var list = $('compareList');
+  var empty = $('compareEmpty');
+  if (!compareList.length) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  list.innerHTML = compareList.map(function(s) {
+    var p = findPickData(s);
+    return '' +
+      '<div class="alert-item">' +
+        '<div>' +
+          '<div class="sym">' + s + '</div>' +
+          '<div class="cond">' + (p ? p.setup + ' · score ' + p.score : 'No data') + '</div>' +
+        '</div>' +
+        (p ? '<span class="verdict ' + (p.group === 'CORE' ? 'v-supports' : 'v-warns') + '">' + p.group + '</span>' : '') +
+      '</div>';
+  }).join('');
+}
+
+// ===== SIDE TABS =====
+document.querySelectorAll('.side-tab').forEach(function(t) {
+  t.addEventListener('click', function() {
+    document.querySelectorAll('.side-tab').forEach(function(x) { x.classList.remove('active'); });
+    document.querySelectorAll('.side-panel').forEach(function(x) { x.classList.remove('active'); });
+    t.classList.add('active');
+    var panel = document.querySelector('.side-panel[data-panel="' + t.dataset.side + '"]');
+    if (panel) panel.classList.add('active');
+  });
+});
+
+// ===== MODAL =====
+function openModal(symbol, note) {
+  $('wlModalSymbol').value = symbol || '';
+  $('wlModalNote').value = note || '';
+  $('wlModalTitle').textContent = symbol ? ('Add ' + symbol) : 'Add ticker';
+  $('wlModal').style.display = 'flex';
+  setTimeout(function() { $('wlModalSymbol').focus(); }, 100);
+}
+function closeModal() { $('wlModal').style.display = 'none'; }
+
+$('addManualBtn').addEventListener('click', function() { openModal('', ''); });
+$('wlModalCancel').addEventListener('click', closeModal);
+$('wlModalSave').addEventListener('click', function() {
+  var sym = $('wlModalSymbol').value.toUpperCase().trim();
+  var note = $('wlModalNote').value.trim();
+  if (!sym) { alert('Enter a symbol'); return; }
+  addToWatchlist(sym, note);
+  closeModal();
+});
+
+// ===== CLEAR ALL =====
+$('clearAllBtn').addEventListener('click', function() {
+  if (!confirm('Clear ALL saved tickers and alerts?')) return;
+  watchlist = [];
+  alerts = [];
+  Store.set('watchlist', watchlist);
+  Store.set('alerts', alerts);
+  renderWatchlist();
+  renderAlerts();
+  renderComparePanel();
+});
+
+// ===== MODAL CLICK-OUTSIDE CLOSE =====
+$('wlModal').addEventListener('click', function(e) {
+  if (e.target === $('wlModal')) closeModal();
+});
+
+// ===== SYNC FROM OTHER PAGES =====
+// When analyst or console save a symbol to localStorage "savedFrom",
+// we pick it up here and add it to the watchlist.
+function checkIncomingSaves() {
+  var incoming = Store.get('pendingSave', null);
+  if (incoming) {
+    addToWatchlist(incoming.symbol, incoming.note || '');
+    Store.remove('pendingSave');
+  }
+}
+
+// ===== BOOT =====
+function boot() {
+  checkIncomingSaves();
+  renderWatchlist();
+  renderAlerts();
+  renderComparePanel();
+  updateStats();
+}
+
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+  setTimeout(boot, 50);
+} else {
+  document.addEventListener('DOMContentLoaded', boot);
+}
+
+// ===== CROSS-TAB SYNC =====
+// If user opens another tab and adds to watchlist, sync on focus
+window.addEventListener('focus', function() {
+  watchlist = Store.get('watchlist', []);
+  alerts = Store.get('alerts', []);
+  renderWatchlist();
+  renderAlerts();
+  renderComparePanel();
+  updateStats();
+});
+</script>
+</body>
+</html>
