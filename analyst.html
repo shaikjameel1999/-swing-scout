@@ -207,3 +207,265 @@
 </section>
 
 <div id="footer-slot"></div>
+  
+<script src="assets/mock.js"></script>
+<script src="assets/app.js"></script>
+<script>
+var $ = function(id) { return document.getElementById(id); };
+var r2 = function(n) { return Math.round(n * 100) / 100; };
+var sleep = function(ms) { return new Promise(function(r) { setTimeout(r, ms); }); };
+
+var REJECTED = {
+  'ADANIENT': 'On ASM list — hard rule exclusion',
+  'YESBANK': 'ATV below ₹10 Cr — liquidity fail',
+  'IRCTC': 'Earnings within window + 2 days',
+  'ZOMATO': 'Extended 2.1 ATR above 20-DMA',
+  'PAYTM': 'Reward:Risk below 1.5:1',
+  'IDEA': 'Circuit-locked — no entry possible'
+};
+
+// ===== COMPARE STATE =====
+var compareList = Store.get('compareList', []);
+var history = Store.get('analystHistory', []);
+var currentSymbol = '';
+
+function renderCompareChips() {
+  var c = $('compareChips');
+  var clr = $('clearCompare');
+  if (!compareList.length) {
+    c.innerHTML = '<span class="text-xs muted">Add up to 3 stocks to compare</span>';
+    clr.style.display = 'none';
+    return;
+  }
+  clr.style.display = 'inline-flex';
+  c.innerHTML = compareList.map(function(s) {
+    return '<span class="compare-chip">' + s + '<button data-rm="' + s + '">×</button></span>';
+  }).join('');
+  c.querySelectorAll('[data-rm]').forEach(function(b) {
+    b.addEventListener('click', function() { removeCompare(b.dataset.rm); });
+  });
+  renderCompareTable();
+}
+
+function addToCompare(sym) {
+  if (compareList.indexOf(sym) !== -1) return;
+  if (compareList.length >= 3) { alert('Max 3 stocks'); return; }
+  compareList.push(sym);
+  Store.set('compareList', compareList);
+  renderCompareChips();
+}
+
+function removeCompare(sym) {
+  compareList = compareList.filter(function(s) { return s !== sym; });
+  Store.set('compareList', compareList);
+  renderCompareChips();
+}
+
+$('clearCompare').addEventListener('click', function() {
+  compareList = [];
+  Store.set('compareList', compareList);
+  renderCompareChips();
+});
+
+// ===== HISTORY =====
+function renderHistory() {
+  var list = $('anHistory');
+  var empty = $('anHistoryEmpty');
+  if (!history.length) { list.innerHTML = ''; empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  list.innerHTML = history.slice(0, 10).map(function(h) {
+    var dt = new Date(h.t).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+    return '<div class="history-item">' +
+      '<div><div class="sym">' + h.symbol + '</div><div class="time">' + dt + '</div></div>' +
+      '<span class="verdict ' + verdictClassFor(h.verdict) + '">' + h.verdict + '</span>' +
+    '</div>';
+  }).join('');
+}
+
+function verdictClassFor(v) {
+  if (v === 'STRONG SETUP') return 'v-supports';
+  if (v === 'WORKABLE') return 'v-neutral';
+  if (v === 'WAIT') return 'v-warns';
+  return 'v-veto';
+}
+
+function pushHistory(symbol, verdict) {
+  history.unshift({ symbol: symbol, verdict: verdict, t: Date.now() });
+  history = history.slice(0, 30);
+  Store.set('analystHistory', history);
+  renderHistory();
+}
+
+$('clearHistory').addEventListener('click', function() {
+  if (!confirm('Clear all analysis history?')) return;
+  history = [];
+  Store.set('analystHistory', history);
+  renderHistory();
+});
+
+// ===== AGENT STREAM =====
+async function analyze(symbol) {
+  var sym = symbol.trim().toUpperCase();
+  if (!sym) return;
+  currentSymbol = sym;
+
+  $('anEmpty').style.display = 'none';
+  $('anResult').style.display = 'block';
+  $('anAgentStream').innerHTML = '';
+  $('anPlanSlot').innerHTML = '';
+  $('anCompareSlot').innerHTML = '';
+
+  var pick = MOCK.picks.find(function(p) { return p.symbol === sym; });
+  var rejection = REJECTED[sym];
+
+  // Stream the 13 agents
+  for (var i = 0; i < MOCK.agents.length; i++) {
+    var a = MOCK.agents[i];
+    var stream = $('anAgentStream');
+    var el = document.createElement('div');
+    el.className = 'agent-card-live show';
+    el.innerHTML =
+      '<div class="flex between center mb-2 flex-wrap gap-2">' +
+        '<div class="flex center gap-3">' +
+          '<span class="mono text-xs muted">' + String(a.id).padStart(2, '0') + '</span>' +
+          '<strong style="font-family:var(--font-display); font-size:15px;">' + a.name + '</strong>' +
+        '</div>' +
+        '<span class="thinking-dots"><span></span><span></span><span></span></span>' +
+      '</div>';
+    stream.appendChild(el);
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    await sleep(420 + Math.random() * 200);
+
+    var bullets = a.bullets.map(function(b) { return '<li>• ' + b + '</li>'; }).join('');
+    el.className = 'agent-card-live show verdict-' + a.verdict;
+    el.innerHTML =
+      '<div class="flex between center mb-2 flex-wrap gap-2">' +
+        '<div class="flex center gap-3">' +
+          '<span class="mono text-xs muted">' + String(a.id).padStart(2, '0') + '</span>' +
+          '<strong style="font-family:var(--font-display); font-size:15px;">' + a.name + '</strong>' +
+        '</div>' +
+        '<div class="flex center gap-2">' +
+          verdictBadge(a.verdict) +
+          '<span class="text-xs muted mono">' + a.confidence + '%</span>' +
+          '<span class="prov prov-' + a.prov + '">' + a.prov.toUpperCase() + '</span>' +
+        '</div>' +
+      '</div>' +
+      '<ul style="list-style:none; font-size:13px; color:var(--muted); display:grid; gap:3px; padding-left:24px;">' +
+        bullets +
+      '</ul>';
+    await sleep(80);
+  }
+
+  await sleep(300);
+  renderVerdict(sym, pick, rejection);
+}
+
+// ===== RENDER VERDICT =====
+function renderVerdict(sym, pick, rejection) {
+  var vh = $('anVerdict');
+  var word, score, qualify, cls;
+
+  if (rejection) {
+    word = 'AVOID';
+    score = '—';
+    qualify = 'Hard rule failed';
+    cls = 'AVOID';
+  } else if (!pick) {
+    word = 'WAIT';
+    score = '—';
+    qualify = 'Not in demo set';
+    cls = 'WAIT';
+  } else if (pick.group === 'CORE') {
+    word = 'STRONG SETUP';
+    score = pick.score;
+    qualify = 'Qualifies as CORE';
+    cls = 'STRONG';
+  } else if (pick.group === 'SECONDARY') {
+    word = 'WORKABLE';
+    score = pick.score;
+    qualify = 'Qualifies as SECONDARY';
+    cls = 'WORKABLE';
+  } else {
+    word = 'WORKABLE';
+    score = pick.score;
+    qualify = 'Qualifies as EXPLORER';
+    cls = 'WORKABLE';
+  }
+
+  vh.className = 'verdict-hero mb-4 ' + cls;
+  $('anVerdictWord').textContent = word;
+  $('anScore').textContent = score === '—' ? '—' : score + ' / 100';
+  $('anQualify').textContent = qualify;
+  $('anQualify').className = 'verdict ' + (rejection ? 'v-veto' : (cls === 'STRONG' ? 'v-supports' : (cls === 'WORKABLE' ? 'v-neutral' : 'v-warns')));
+
+  // Trade plan
+  if (pick) {
+    $('anPlanSlot').innerHTML = renderPlan(pick);
+  } else if (rejection) {
+    $('anPlanSlot').innerHTML =
+      '<div class="card" style="border-left:3px solid var(--coral);">' +
+        '<h3 class="mb-2">Rejected</h3>' +
+        '<p class="muted text-sm">' + rejection + '</p>' +
+        '<p class="text-xs muted mt-3">Hard rules cannot be relaxed. This stock is excluded from consideration today.</p>' +
+      '</div>';
+  } else {
+    $('anPlanSlot').innerHTML =
+      '<div class="card">' +
+        '<h3 class="mb-2">Not in the demo set</h3>' +
+        '<p class="muted text-sm mb-4">This symbol isn\'t covered in the Phase 1 demo. Try one of these to see the full agent audit:</p>' +
+        '<div class="suggest-row">' +
+          MOCK.picks.map(function(p) { return '<button data-sym="' + p.symbol + '">' + p.symbol + '</button>'; }).join('') +
+        '</div>' +
+      '</div>';
+    document.querySelectorAll('#anPlanSlot button[data-sym]').forEach(function(b) {
+      b.addEventListener('click', function() { $('analystInput').value = b.dataset.sym; analyze(b.dataset.sym); });
+    });
+  }
+
+  pushHistory(sym, word);
+  window.scrollTo({ top: 200, behavior: 'smooth' });
+}
+
+// ===== TRADE PLAN RENDER =====
+function renderPlan(p) {
+  var groupCls = p.group === 'CORE' ? 'v-supports' : (p.group === 'EXPLORER' ? 'v-neutral' : 'v-warns');
+  var html = '';
+  html += '<div class="card">';
+  html += '<div class="flex between center wrap gap-3 mb-4">';
+  html += '<div><div class="mono bold" style="font-size:22px;">' + p.symbol + '</div><div class="text-sm muted">' + p.company + ' · ' + p.sector + '</div></div>';
+  html += '<div style="text-align:right;"><div class="mono bold" style="font-size:18px;">₹' + p.price.toLocaleString('en-IN') + '</div><div class="text-sm" style="color:var(--primary);">' + p.change + '</div></div>';
+  html += '</div>';
+  html += '<div class="flex wrap gap-2 mb-4">';
+  html += '<span class="verdict ' + groupCls + '">' + p.group + '</span>';
+  html += '<span class="verdict v-neutral">' + p.setup + '</span>';
+  html += '<span class="verdict ' + (p.confidence === 'HIGH' ? 'v-supports' : 'v-warns') + '">' + p.confidence + '</span>';
+  if (p.fresh) html += '<span class="prov prov-live">FRESH</span>';
+  else html += '<span class="prov prov-reference">REPEAT</span>';
+  html += '</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:16px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);">';
+  html += '<div><div class="text-xs muted">Entry zone</div><div class="mono bold">' + p.entryZone[0] + '–' + p.entryZone[1] + '</div></div>';
+  html += '<div><div class="text-xs muted">Stop</div><div class="mono bold" style="color:var(--coral);">' + p.stop + '</div></div>';
+  html += '<div><div class="text-xs muted">T1 / T2</div><div class="mono bold" style="color:var(--primary);">' + p.t1 + ' / ' + p.t2 + '</div></div>';
+  html += '</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:14px 0;">';
+  html += '<div><div class="text-xs muted">Reward:Risk</div><div class="mono bold">' + p.rr + ' : 1</div></div>';
+  html += '<div><div class="text-xs muted">Qty</div><div class="mono bold">' + p.qty + '</div></div>';
+  html += '<div><div class="text-xs muted">Capital</div><div class="mono bold">₹' + p.capital.toLocaleString('en-IN') + '</div></div>';
+  html += '</div>';
+  html += '<div style="padding:14px;background:var(--amber-soft);border-radius:10px;font-size:13px;margin-top:8px;">';
+  html += '<strong>Critic:</strong> ' + p.critic + '<br><span class="text-xs muted">Invalidates if: ' + p.invalidates + '</span>';
+  html += '</div>';
+  html += '<div class="flex gap-2 mt-4 flex-wrap">';
+  html += '<button class="btn btn-primary btn-sm" id="addCompareBtn">Add to Compare</button>';
+  html += '<a href="desk.html" class="btn btn-ghost btn-sm">Save to Desk</a>';
+  html += '<a href="chat.html" target="_blank" class="btn btn-ghost btn-sm">Ask Scout Chat</a>';
+  html += '</div>';
+  html += '</div>';
+
+  setTimeout(function() {
+    var b = document.getElementById('addCompareBtn');
+    if (b) b.addEventListener('click', function() { addToCompare(p.symbol); });
+  }, 50);
+
+  return html;
+}
