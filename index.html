@@ -1,393 +1,425 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Swing Scout — NSE Swing Research Ecosystem</title>
-<meta name="description" content="Institutional-grade swing research for retail capital. 13 autonomous agents. Strict capital preservation." />
+<meta name="description" content="Institutional-grade NSE swing research for retail capital. 13 autonomous agents, strict capital preservation, Day-4 time stop." />
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
 
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  tailwind.config = {
-    theme: {
-      extend: {
-        colors: {
-          obsidian: '#0A0B0F',
-          surface: '#12141A',
-          surface2: '#1A1D26',
-          teal: '#4FE3C1',
-          indigo: '#6C7BFF',
-          amber: '#F5B547',
-          coral: '#FF6B6B',
-          fog: '#8A93A6',
-          soft: '#F2F4F8',
-        },
-        fontFamily: {
-          display: ['Sora', 'sans-serif'],
-          body: ['Inter', 'sans-serif'],
-          mono: ['JetBrains Mono', 'monospace'],
-        },
-      },
-    },
-  };
-</script>
-
-<style>
-  html { scroll-behavior: smooth; }
-  body {
-    background: #0A0B0F;
-    color: #F2F4F8;
-    font-family: 'Inter', sans-serif;
-    overflow-x: hidden;
-  }
-  .grain::before {
-    content: '';
-    position: fixed; inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 1;
-  }
-  .glass {
-    background: rgba(18, 20, 26, 0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255,255,255,0.06);
-  }
-  .gradient-text {
-    background: linear-gradient(120deg, #4FE3C1 0%, #6C7BFF 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
-  .glow-teal { box-shadow: 0 0 40px -10px rgba(79, 227, 193, 0.35); }
-  .ticker-track {
-    display: flex;
-    animation: scroll 40s linear infinite;
-    width: max-content;
-  }
-  @keyframes scroll {
-    from { transform: translateX(0); }
-    to { transform: translateX(-50%); }
-  }
-  .fade-in {
-    opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.8s ease, transform 0.8s ease;
-  }
-  .fade-in.visible { opacity: 1; transform: translateY(0); }
-  .agent-card { transition: all 0.3s ease; }
-  .agent-card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(79, 227, 193, 0.4);
-    background: rgba(26, 29, 38, 0.9);
-  }
-  details summary::-webkit-details-marker { display: none; }
-  details[open] .chev { transform: rotate(180deg); }
-  .chev { transition: transform 0.3s ease; }
-</style>
+<link rel="stylesheet" href="assets/style.css">
 </head>
 
-<body class="grain">
+<body data-page="index.html">
 
-<!-- NAV -->
-<nav class="fixed top-0 left-0 right-0 z-50 glass">
-  <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-teal to-indigo flex items-center justify-center font-display font-bold text-obsidian">S</div>
-      <span class="font-display font-bold text-lg">Swing Scout</span>
-    </div>
-    <div class="hidden md:flex items-center gap-8 text-sm text-fog">
-      <a href="#lifecycle" class="hover:text-teal transition">Lifecycle</a>
-      <a href="#agents" class="hover:text-teal transition">Agents</a>
-      <a href="#defense" class="hover:text-teal transition">Guardrails</a>
-      <a href="#growth" class="hover:text-teal transition">Growth</a>
-      <a href="#faq" class="hover:text-teal transition">FAQ</a>
-    </div>
-    <a href="#cta" class="px-4 py-2 rounded-lg bg-gradient-to-r from-teal to-indigo text-obsidian font-semibold text-sm hover:opacity-90 transition">Launch Console</a>
-  </div>
-</nav>
+<div id="nav-slot"></div>
 
 <!-- TICKER -->
-<section class="pt-20 bg-surface border-b border-white/5 overflow-hidden">
-  <div class="ticker-track py-3">
-    <div class="flex gap-8 px-4 text-sm font-mono whitespace-nowrap" id="ticker1"></div>
-    <div class="flex gap-8 px-4 text-sm font-mono whitespace-nowrap" id="ticker2"></div>
-  </div>
-</section>
+<div class="ticker">
+  <div class="ticker-track" id="tickerTrack"></div>
+</div>
 
 <!-- HERO -->
-<section class="relative pt-24 pb-32 px-6">
-  <div class="absolute inset-0 overflow-hidden pointer-events-none">
-    <div class="absolute top-1/3 left-1/2 -translate-x-1/2 w-[600px] h-[600px] bg-teal/10 rounded-full blur-[120px]"></div>
-    <div class="absolute top-1/2 left-1/4 w-[400px] h-[400px] bg-indigo/10 rounded-full blur-[120px]"></div>
-  </div>
-  <div class="max-w-5xl mx-auto text-center relative z-10">
-    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full glass text-xs text-fog mb-6">
-      <span class="w-2 h-2 rounded-full bg-teal animate-pulse"></span>
-      Research & Intelligence Only — Not Financial Advice
-    </div>
-    <h1 class="font-display font-extrabold text-5xl md:text-7xl leading-tight mb-6">
-      Institutional-Grade<br/>
-      <span class="gradient-text">Swing Research</span><br/>
-      for Retail Capital.
-    </h1>
-    <p class="text-fog text-lg max-w-2xl mx-auto mb-10">
-      13 autonomous agents vet NSE equities with zero fabrication. Structure-based stops, pre-open gap validation, friction-aware position sizing, and adversarial counter-cases.
-    </p>
-    <div class="flex flex-wrap justify-center gap-3 mb-12 text-sm">
-      <span class="px-3 py-1.5 rounded-full glass">✅ No Blind Guesses</span>
-      <span class="px-3 py-1.5 rounded-full glass">⏱️ Strict Day-4 Time Stop</span>
-      <span class="px-3 py-1.5 rounded-full glass">💰 Charges &lt; 15% T1 Rule</span>
-    </div>
-    <div class="flex flex-wrap justify-center gap-4">
-      <a href="#cta" class="px-6 py-3 rounded-xl bg-gradient-to-r from-teal to-indigo text-obsidian font-semibold hover:opacity-90 transition glow-teal">Launch the Console →</a>
-      <a href="#lifecycle" class="px-6 py-3 rounded-xl glass font-semibold hover:bg-surface2 transition">See the Lifecycle</a>
+<section class="section" style="padding-top:64px; padding-bottom:56px; position:relative;">
+  <div class="container">
+    <div style="display:grid; grid-template-columns: 1.15fr 0.85fr; gap:56px; align-items:center;" class="hero-grid">
+      <div class="fade-in">
+        <div class="flex wrap gap-2" style="margin-bottom:20px;">
+          <span class="prov prov-live">● LIVE</span>
+          <span class="demo-chip">Phase 1 Demo</span>
+          <span class="prov prov-reference">Research Only</span>
+        </div>
+        <h1 style="margin-bottom:20px;">
+          Institutional-grade <span class="gradient-text">swing research</span> for retail capital.
+        </h1>
+        <p class="muted" style="font-size:17px; max-width:560px; margin-bottom:28px;">
+          13 autonomous agents audit NSE equities with zero fabrication.
+          Structure-based stops, pre-open gap validation, friction-aware sizing,
+          and adversarial counter-cases on every pick.
+        </p>
+        <div class="flex wrap gap-3">
+          <a href="console.html" class="btn btn-primary">Open the Console →</a>
+          <a href="chat.html" target="_blank" class="btn btn-ghost">Open Scout Chat</a>
+        </div>
+        <div class="flex wrap gap-4" style="margin-top:28px; font-size:13px; color:var(--muted);">
+          <span>✓ No blind guesses</span>
+          <span>✓ Day-4 time stop</span>
+          <span>✓ Charges &lt; 15% of T1</span>
+        </div>
+      </div>
+
+      <!-- Preview Pick Card -->
+      <div class="fade-in">
+        <div class="card" style="box-shadow: var(--shadow-lg);">
+          <div class="flex between center mb-4">
+            <div class="flex center gap-2">
+              <span class="prov prov-live">● LIVE</span>
+              <span class="prov prov-delayed">DELAYED · 5m</span>
+            </div>
+            <span class="demo-chip">Demo Data</span>
+          </div>
+          <div class="flex between center mb-4">
+            <div>
+              <div class="mono bold" style="font-size:22px;">RELIANCE</div>
+              <div class="text-sm muted">Reliance Industries · Energy</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="mono bold" style="font-size:20px;">₹1,284.50</div>
+              <div class="mono text-sm" style="color:var(--primary);">+0.82%</div>
+            </div>
+          </div>
+          <div class="flex wrap gap-2 mb-4">
+            <span class="score-pill">Score 84</span>
+            <span class="verdict v-supports">CORE</span>
+            <span class="verdict v-neutral">Pullback</span>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; padding:14px 0; border-top:1px solid var(--border); border-bottom:1px solid var(--border);">
+            <div>
+              <div class="text-xs muted">Entry</div>
+              <div class="mono bold">1280–1292</div>
+            </div>
+            <div>
+              <div class="text-xs muted">Stop</div>
+              <div class="mono bold" style="color:var(--coral);">1248</div>
+            </div>
+            <div>
+              <div class="text-xs muted">T1 / T2</div>
+              <div class="mono bold" style="color:var(--primary);">1345 / 1385</div>
+            </div>
+          </div>
+          <div class="flex between center mt-4 text-sm">
+            <span class="muted">Reward:Risk</span>
+            <span class="mono bold">2.4 : 1</span>
+          </div>
+          <div class="flex between center mt-2 text-sm">
+            <span class="muted">Risk / Trade</span>
+            <span class="mono bold">₹148 (0.99%)</span>
+          </div>
+          <div class="flex between center mt-2 text-sm">
+            <span class="muted">Exit Deadline</span>
+            <span class="mono bold">13 Oct 2026</span>
+          </div>
+          <div style="margin-top:16px; padding:12px; background:var(--amber-soft); border-radius:10px; font-size:12px; color:var(--ink-soft);">
+            <strong>Critic:</strong> Sector extended 4.2% in 3 days — counter-case MODERATE
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-<!-- LIFECYCLE -->
-<section id="lifecycle" class="py-24 px-6">
-  <div class="max-w-7xl mx-auto">
-    <div class="text-center mb-16 fade-in">
-      <p class="text-teal font-mono text-sm mb-3">// THE PROTOCOL</p>
-      <h2 class="font-display font-bold text-4xl md:text-5xl mb-4">The 5-Step Swing Lifecycle</h2>
-      <p class="text-fog max-w-2xl mx-auto">Deterministic protocol engineered to prevent retail traps, emotional chasing, and capital decay.</p>
+<!-- REGIME + DATA HEALTH -->
+<section class="section" style="padding-top:24px; padding-bottom:48px;">
+  <div class="container">
+    <div class="grid grid-2">
+      <div class="card fade-in">
+        <div class="flex between center mb-4">
+          <div>
+            <div class="text-xs muted mono">MARKET REGIME</div>
+            <div style="font-family:var(--font-display); font-size:26px; font-weight:700; margin-top:4px;">NEUTRAL</div>
+          </div>
+          <span class="score-pill">72% confidence</span>
+        </div>
+        <ul style="list-style:none; display:grid; gap:8px; font-size:14px; color:var(--ink-soft);">
+          <li>• NIFTY 50 above 20 &amp; 50-DMA, below 200-DMA slope</li>
+          <li>• India VIX at 13.45 (−2.32% DoD) — calm regime</li>
+          <li>• Breadth: 1,247 advances / 892 declines</li>
+          <li>• FII net: −₹1,240 Cr (3-session net −₹3,410 Cr)</li>
+          <li>• GIFT Nifty +0.18% — flat open expected</li>
+        </ul>
+      </div>
+      <div class="card fade-in">
+        <div class="flex between center mb-4">
+          <div>
+            <div class="text-xs muted mono">DATA HEALTH</div>
+            <div style="font-family:var(--font-display); font-size:26px; font-weight:700; margin-top:4px;">78%</div>
+          </div>
+          <span class="demo-chip">Mock Session</span>
+        </div>
+        <div style="display:grid; gap:10px; font-size:13px;">
+          <div class="flex between"><span class="prov prov-live">LIVE</span><span class="mono">14 sources</span></div>
+          <div class="flex between"><span class="prov prov-delayed">DELAYED</span><span class="mono">4 sources</span></div>
+          <div class="flex between"><span class="prov prov-reference">REFERENCE</span><span class="mono">3 sources</span></div>
+          <div class="flex between"><span class="prov prov-unavailable">UNAVAILABLE</span><span class="mono">2 sources</span></div>
+        </div>
+        <p class="text-xs muted mt-4">Phase 1 shows simulated provenance. Phase 2 wires real NSE + Yahoo sources server-side.</p>
+      </div>
     </div>
-    <div class="grid md:grid-cols-2 lg:grid-cols-5 gap-4">
-      <!-- Step cards -->
-      <div class="fade-in glass rounded-2xl p-6 hover:border-teal/30 transition">
-        <div class="text-teal font-mono text-xs mb-3">01</div>
-        <h3 class="font-display font-semibold mb-2">Universe Screening</h3>
-        <p class="text-sm text-fog">7 distinct scans parse 40+ liquid NSE candidates each session.</p>
-      </div>
-      <div class="fade-in glass rounded-2xl p-6 hover:border-teal/30 transition">
-        <div class="text-teal font-mono text-xs mb-3">02</div>
-        <h3 class="font-display font-semibold mb-2">Adversarial Audit</h3>
-        <p class="text-sm text-fog">13 agents vet liquidity, ASM/GSM, and geometry. The Critic challenges survivors.</p>
-      </div>
-      <div class="fade-in glass rounded-2xl p-6 hover:border-teal/30 transition">
-        <div class="text-teal font-mono text-xs mb-3">03</div>
-        <h3 class="font-display font-semibold mb-2">Friction Sizing</h3>
-        <p class="text-sm text-fog">Shares sized for ₹15k accounts. Charges &gt; 15% of T1 → rejected.</p>
-      </div>
-      <div class="fade-in glass rounded-2xl p-6 hover:border-teal/30 transition">
-        <div class="text-teal font-mono text-xs mb-3">04</div>
-        <h3 class="font-display font-semibold mb-2">Pre-Open Check</h3>
-        <p class="text-sm text-fog">08:45 AM validation vs GIFT NIFTY. Gaps &gt; 0.5% void the pick.</p>
-      </div>
-      <div class="fade-in glass rounded-2xl p-6 hover:border-teal/30 transition">
-        <div class="text-teal font-mono text-xs mb-3">05</div>
-        <h3 class="font-display font-semibold mb-2">Day-4 Time Stop</h3>
-        <p class="text-sm text-fog">Book half at T1, trail to breakeven, close rest at Day-4.</p>
-      </div>
+  </div>
+</section>
+
+<!-- TODAY'S WATCHLIST -->
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <p class="kicker">// TODAY'S WATCHLIST</p>
+      <h2>Core and Secondary picks</h2>
+      <p class="lead">Full-conviction setups first. If fewer qualify, we show fewer — quality over quantity.</p>
     </div>
+
+    <h3 class="mb-4">CORE · Full Conviction</h3>
+    <div class="grid grid-2 mb-6" id="coreGrid"></div>
+
+    <h3 class="mb-4">SECONDARY · Reduced Size</h3>
+    <div class="grid grid-2" id="secondaryGrid"></div>
   </div>
 </section>
 
 <!-- AGENTS -->
-<section id="agents" class="py-24 px-6 bg-surface/50">
-  <div class="max-w-7xl mx-auto">
-    <div class="text-center mb-16 fade-in">
-      <p class="text-indigo font-mono text-sm mb-3">// THE ORCHESTRATOR</p>
-      <h2 class="font-display font-bold text-4xl md:text-5xl mb-4">Meet the 13 Autonomous Agents</h2>
-      <p class="text-fog max-w-2xl mx-auto">Each agent holds specialized jurisdiction. No single factor promotes a trade without cross-agent consensus.</p>
+<section class="section" style="background:var(--bg-soft);">
+  <div class="container">
+    <div class="section-head">
+      <p class="kicker">// THE ORCHESTRATOR</p>
+      <h2>Meet the 13 autonomous agents</h2>
+      <p class="lead">Each agent holds specialized jurisdiction. No single factor promotes a trade without cross-agent consensus.</p>
     </div>
-    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4" id="agentsGrid"></div>
+
+    <div class="pipeline mb-6" id="pipeline"></div>
+
+    <div class="grid grid-3" id="agentGrid"></div>
   </div>
 </section>
 
-<!-- DEFENSE -->
-<section id="defense" class="py-24 px-6">
-  <div class="max-w-7xl mx-auto">
-    <div class="text-center mb-16 fade-in">
-      <p class="text-coral font-mono text-sm mb-3">// CAPITAL DEFENSE</p>
-      <h2 class="font-display font-bold text-4xl md:text-5xl mb-4">Hard Guardrails That Never Bend</h2>
-      <p class="text-fog max-w-2xl mx-auto">Unlike discretionary traders who move stops and rationalize losses, Swing Scout enforces algorithmic gates.</p>
+<!-- LIFECYCLE -->
+<section class="section">
+  <div class="container">
+    <div class="section-head">
+      <p class="kicker">// THE PROTOCOL</p>
+      <h2>The 5-step swing lifecycle</h2>
+      <p class="lead">Deterministic protocol engineered to prevent retail traps, emotional chasing, and capital decay.</p>
     </div>
-    <div class="grid md:grid-cols-3 gap-6">
-      <div class="fade-in glass rounded-2xl p-8 border-l-2 border-l-coral">
-        <div class="text-coral font-mono text-xs mb-4">GUARDRAIL 01</div>
-        <h3 class="font-display font-semibold text-xl mb-3">Friction Rejection</h3>
-        <p class="text-sm text-fog">Setups where statutory charges exceed 15% of Target 1 profit are auto-disqualified.</p>
+    <div class="grid grid-5" id="lifecycleGrid"></div>
+  </div>
+</section>
+
+<!-- GUARDRAILS -->
+<section class="section" style="background:var(--bg-soft);">
+  <div class="container">
+    <div class="section-head">
+      <p class="kicker" style="color:var(--coral);">// CAPITAL DEFENSE</p>
+      <h2>Hard guardrails that never bend</h2>
+      <p class="lead">Unlike discretionary traders who move stops and rationalize losses, Swing Scout enforces algorithmic gates.</p>
+    </div>
+    <div class="grid grid-3">
+      <div class="card card-hover fade-in" style="border-left:3px solid var(--coral);">
+        <div class="mono text-xs mb-2" style="color:var(--coral);">GUARDRAIL 01</div>
+        <h3 class="mb-2">Friction rejection</h3>
+        <p class="text-sm muted">Setups where statutory charges exceed 15% of Target 1 profit are auto-disqualified.</p>
       </div>
-      <div class="fade-in glass rounded-2xl p-8 border-l-2 border-l-amber">
-        <div class="text-amber font-mono text-xs mb-4">GUARDRAIL 02</div>
-        <h3 class="font-display font-semibold text-xl mb-3">Pre-Open Gap Rule</h3>
-        <p class="text-sm text-fog">Gaps &gt; 0.5% above the 1% entry zone are cancelled. Chasing surges is prohibited.</p>
+      <div class="card card-hover fade-in" style="border-left:3px solid var(--amber);">
+        <div class="mono text-xs mb-2" style="color:var(--amber);">GUARDRAIL 02</div>
+        <h3 class="mb-2">Pre-open gap rule</h3>
+        <p class="text-sm muted">Gaps &gt; 0.5% above the 1% entry zone are cancelled. Chasing surges is prohibited.</p>
       </div>
-      <div class="fade-in glass rounded-2xl p-8 border-l-2 border-l-teal">
-        <div class="text-teal font-mono text-xs mb-4">GUARDRAIL 03</div>
-        <h3 class="font-display font-semibold text-xl mb-3">Circuit Breakers</h3>
-        <p class="text-sm text-fog">5% weekly drawdown → 3-day freeze. 10% peak drawdown → Paper Trading mode.</p>
+      <div class="card card-hover fade-in" style="border-left:3px solid var(--primary);">
+        <div class="mono text-xs mb-2" style="color:var(--primary);">GUARDRAIL 03</div>
+        <h3 class="mb-2">Circuit breakers</h3>
+        <p class="text-sm muted">5% weekly drawdown → 3-day freeze. 10% peak drawdown → Paper Trading mode.</p>
       </div>
     </div>
   </div>
 </section>
 
-<!-- GROWTH -->
-<section id="growth" class="py-24 px-6 bg-surface/50">
-  <div class="max-w-5xl mx-auto">
-    <div class="text-center mb-16 fade-in">
-      <p class="text-teal font-mono text-sm mb-3">// COMPOUNDING</p>
-      <h2 class="font-display font-bold text-4xl md:text-5xl mb-4">Small Account Growth Engine</h2>
-      <p class="text-fog max-w-2xl mx-auto">Simulated with disciplined 1% risk per trade and systematic monthly top-ups.</p>
-    </div>
-    <div class="fade-in glass rounded-3xl p-8 md:p-12">
-      <div class="grid md:grid-cols-3 gap-8 mb-10">
+<!-- PLANNER TEASER -->
+<section class="section">
+  <div class="container-narrow">
+    <div class="card fade-in" style="padding:36px;">
+      <div class="section-head" style="margin-bottom:28px;">
+        <p class="kicker">// COMPOUNDING</p>
+        <h2 style="font-size:32px;">Small account growth engine</h2>
+        <p class="lead">Simulate ₹15k to ₹1L with disciplined 1% risk per trade and monthly top-ups.</p>
+      </div>
+      <div class="grid grid-3 mb-6">
         <div>
-          <div class="text-fog text-sm mb-2">Starting Capital</div>
-          <div class="font-mono text-3xl font-semibold">₹<span id="startCap">15,000</span></div>
-          <div class="text-xs text-fog mt-1">₹150 risk per trade</div>
+          <div class="text-xs muted mb-2">Starting Capital</div>
+          <div class="mono bold" style="font-size:26px;">₹15,000</div>
+          <div class="text-xs muted mt-2">₹150 risk / trade</div>
         </div>
         <div>
-          <div class="text-fog text-sm mb-2">Monthly Top-Up</div>
-          <div class="font-mono text-3xl font-semibold">₹<span id="monthly">2,500</span></div>
-          <div class="text-xs text-fog mt-1">From earned income</div>
+          <div class="text-xs muted mb-2">Monthly Top-Up</div>
+          <div class="mono bold" style="font-size:26px;">₹<span id="monthlyVal">2,500</span></div>
+          <div class="text-xs muted mt-2">From earned income</div>
         </div>
         <div>
-          <div class="text-fog text-sm mb-2">Milestone Target</div>
-          <div class="font-mono text-3xl font-semibold gradient-text">₹<span id="target">1,00,000</span></div>
-          <div class="text-xs text-fog mt-1">16–22 months @ 4% edge</div>
+          <div class="text-xs muted mb-2">Milestone Target</div>
+          <div class="mono bold gradient-text" style="font-size:26px;">₹1,00,000</div>
+          <div class="text-xs muted mt-2">16–22 months @ 4% edge</div>
         </div>
       </div>
-      <div class="h-3 rounded-full bg-surface2 overflow-hidden mb-3">
-        <div id="progressBar" class="h-full bg-gradient-to-r from-teal to-indigo transition-all duration-300" style="width: 15%"></div>
+      <input type="range" min="1000" max="10000" step="500" value="2500" id="monthlySlider" style="width:100%; accent-color:var(--primary);" />
+      <div class="flex between text-xs muted mt-2">
+        <span>₹1,000</span>
+        <span>₹10,000 / month</span>
       </div>
-      <div class="text-center">
-        <div class="text-sm text-fog mb-4">Simulate monthly top-up</div>
-        <input type="range" min="1000" max="10000" step="500" value="2500" id="slider" class="w-full accent-teal" />
-      </div>
+      <a href="desk.html" class="btn btn-primary mt-6" style="width:100%; justify-content:center;">Open full planner in Trading Desk →</a>
     </div>
   </div>
 </section>
 
 <!-- FAQ -->
-<section id="faq" class="py-24 px-6">
-  <div class="max-w-3xl mx-auto">
-    <div class="text-center mb-16 fade-in">
-      <h2 class="font-display font-bold text-4xl md:text-5xl mb-4">Frequently Answered Inquiries</h2>
+<section class="section" style="background:var(--bg-soft);">
+  <div class="container-narrow">
+    <div class="section-head">
+      <h2>Frequently answered inquiries</h2>
     </div>
-    <div class="space-y-3 fade-in" id="faqList"></div>
+    <div id="faqList" style="display:grid; gap:10px;"></div>
   </div>
 </section>
 
 <!-- CTA -->
-<section id="cta" class="py-32 px-6 relative">
-  <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-    <div class="w-[500px] h-[500px] bg-teal/10 rounded-full blur-[120px]"></div>
-  </div>
-  <div class="max-w-3xl mx-auto text-center relative z-10">
-    <h2 class="font-display font-bold text-4xl md:text-6xl mb-6">Stop Guessing.<br/><span class="gradient-text">Start Systematizing.</span></h2>
-    <p class="text-fog mb-10">Audit today's NSE equity setups with verifiable provenance and strict capital preservation.</p>
-    <a href="#" class="inline-block px-8 py-4 rounded-xl bg-gradient-to-r from-teal to-indigo text-obsidian font-bold hover:opacity-90 transition glow-teal">Launch the Console →</a>
+<section class="section" style="text-align:center;">
+  <div class="container-narrow">
+    <h2 class="mb-4">Stop guessing. <span class="gradient-text">Start systematizing.</span></h2>
+    <p class="muted mb-6">Audit today's NSE equity setups with verifiable provenance and strict capital preservation.</p>
+    <a href="console.html" class="btn btn-primary" style="font-size:16px; padding:14px 28px;">Launch the Console →</a>
   </div>
 </section>
 
-<!-- FOOTER -->
-<footer class="py-12 px-6 border-t border-white/5 text-center text-sm text-fog">
-  <p class="mb-2">Swing Scout — Research & Intelligence Only. Not Financial Advice.</p>
-  <p class="text-xs">Cash-market equities · 3–4 day horizon · Max 1% trade risk · Strict 4-day time stop</p>
-</footer>
+<div id="footer-slot"></div>
 
+<script src="assets/mock.js"></script>
+<script src="assets/app.js"></script>
 <script>
-  // ==== TICKER ====
-  const tickerData = [
-    { name: 'NIFTY 50', val: '25,250.50', chg: '+0.29%', up: true },
-    { name: 'BANK NIFTY', val: '51,840.20', chg: '+0.28%', up: true },
-    { name: 'INDIA VIX', val: '13.45', chg: '-2.32%', up: false },
-    { name: 'GIFT NIFTY', val: '25,280.00', chg: '+0.18%', up: true },
-    { name: 'BRENT CRUDE', val: '$74.80', chg: '-0.53%', up: false },
-    { name: 'USD/INR', val: '₹84.15', chg: '-0.02%', up: false },
-  ];
-  function renderTicker(id) {
-    const el = document.getElementById(id);
-    el.innerHTML = tickerData.map(t => `
-      <span class="flex items-center gap-2">
-        <span class="text-fog">${t.name}</span>
-        <span class="text-soft">${t.val}</span>
-        <span class="${t.up ? 'text-teal' : 'text-coral'}">${t.chg}</span>
-      </span>
-    `).join('');
-  }
-  renderTicker('ticker1');
-  renderTicker('ticker2');
+  // ===== TICKER =====
+  (function () {
+    const track = document.getElementById('tickerTrack');
+    const items = MOCK.ticker.map(t => `
+      <span class="ticker-item">
+        <span class="name">${t.name}</span>
+        <span class="val">${t.val}</span>
+        <span class="${t.up ? 'up' : 'down'}">${t.chg}</span>
+      </span>`).join('');
+    track.innerHTML = items + items; // duplicate for seamless loop
+  })();
 
-  // ==== AGENTS ====
-  const agents = [
-    { n: 'Market Regime', d: 'Macro & VIX trend, breadth, FII/DII net flows, global cues.' },
-    { n: 'Screener Universe', d: '7 scans across NIFTY 500 & liquid midcaps into 40+ candidates.' },
-    { n: 'Technicals', d: 'DMA alignment, RSI momentum, MACD, ATR stop distance.' },
-    { n: 'News & Catalyst', d: 'Vetoes binary event risk (earnings/board meetings in window).' },
-    { n: 'Sentiment', d: 'Google News RSS, Reddit sentiment, hype pump warnings.' },
-    { n: 'Smart Money', d: 'Delivery % (5 sessions) & institutional block window checks.' },
-    { n: 'Sector Rotation', d: '1-week & 1-month relative strength vs benchmark.' },
-    { n: 'Derivatives (F&O)', d: 'Option-chain PCR, OI shifts, long buildup detection.' },
-    { n: 'Fundamentals', d: 'Promoter pledging screen, debt sanity, last 2 quarter trends.' },
-    { n: 'Surveillance & Liquidity', d: 'ASM/GSM elimination & ₹10Cr 20-day ATV threshold.' },
-    { n: 'Risk Manager', d: 'Highest authority. Position sizing for ₹15k & friction rules.' },
-    { n: 'Critic Agent', d: 'Adversarial prosecutor. Strongest counter-case & invalidation trigger.' },
-    { n: 'Orchestrator', d: 'Pipeline execution, stage tracking, consensus synthesis.' },
-  ];
-  document.getElementById('agentsGrid').innerHTML = agents.map((a, i) => `
-    <div class="agent-card glass rounded-2xl p-6 cursor-pointer fade-in">
-      <div class="flex items-center justify-between mb-3">
-        <div class="font-mono text-xs text-teal">${String(i+1).padStart(2,'0')}</div>
-        <div class="w-1.5 h-1.5 rounded-full bg-teal animate-pulse"></div>
+  // ===== PICKS =====
+  function pickCard(p) {
+    const groupCls = p.group === 'CORE' ? 'v-supports' : (p.group === 'EXPLORER' ? 'v-neutral' : 'v-warns');
+    return `
+      <div class="card card-hover fade-in">
+        <div class="flex between center mb-3">
+          <div class="flex center gap-2">
+            <span class="verdict ${groupCls}">${p.group}</span>
+            ${p.fresh ? '<span class="prov prov-live">FRESH</span>' : '<span class="prov prov-reference">REPEAT</span>'}
+          </div>
+          <span class="score-pill">Score ${p.score}</span>
+        </div>
+        <div class="flex between center mb-3">
+          <div>
+            <div class="mono bold" style="font-size:19px;">${p.symbol}</div>
+            <div class="text-xs muted">${p.company} · ${p.sector}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="mono bold">₹${p.price.toLocaleString('en-IN')}</div>
+            <div class="text-xs" style="color:var(--primary);">${p.change}</div>
+          </div>
+        </div>
+        <div class="flex wrap gap-2 mb-3">
+          <span class="verdict v-neutral">${p.setup}</span>
+          <span class="verdict ${p.confidence === 'HIGH' ? 'v-supports' : 'v-warns'}">${p.confidence}</span>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; padding:12px 0; border-top:1px solid var(--border); font-size:13px;">
+          <div>
+            <div class="text-xs muted">Entry</div>
+            <div class="mono bold">${p.entryZone[0]}–${p.entryZone[1]}</div>
+          </div>
+          <div>
+            <div class="text-xs muted">Stop</div>
+            <div class="mono bold" style="color:var(--coral);">${p.stop}</div>
+          </div>
+          <div>
+            <div class="text-xs muted">T1 / T2</div>
+            <div class="mono bold" style="color:var(--primary);">${p.t1} / ${p.t2}</div>
+          </div>
+        </div>
+        <div class="flex between text-xs mt-2">
+          <span class="muted">R:R</span><span class="mono bold">${p.rr} : 1</span>
+        </div>
+        <div class="flex between text-xs mt-1">
+          <span class="muted">Qty / Capital</span><span class="mono">${p.qty} · ₹${p.capital.toLocaleString('en-IN')}</span>
+        </div>
+        <div class="flex between text-xs mt-1">
+          <span class="muted">Exit deadline</span><span class="mono">${p.exitDeadline}</span>
+        </div>
+        ${p.relaxed ? `<div class="mt-3 text-xs" style="padding:8px 10px; background:var(--amber-soft); border-radius:8px;">Relaxed: ${p.relaxed}</div>` : ''}
+        <div class="mt-3 text-xs" style="padding:10px; background:var(--surface-2); border-radius:8px;">
+          <strong>Critic:</strong> ${p.critic}
+        </div>
+      </div>`;
+  }
+  document.getElementById('coreGrid').innerHTML = MOCK.picks.filter(p => p.group === 'CORE').map(pickCard).join('');
+  document.getElementById('secondaryGrid').innerHTML = MOCK.picks.filter(p => p.group !== 'CORE').map(pickCard).join('');
+
+  // ===== PIPELINE =====
+  (function () {
+    const el = document.getElementById('pipeline');
+    const nodes = MOCK.agents.map((a, i) => {
+      const dot = `<div class="pipeline-dot">${String(i + 1).padStart(2, '0')}</div>`;
+      const label = `<div class="pipeline-label">${a.name}</div>`;
+      const line = i < MOCK.agents.length - 1 ? '<div class="pipeline-line done"></div>' : '';
+      return `<div class="pipeline-node done">${dot}${label}</div>${line}`;
+    }).join('');
+    el.innerHTML = nodes;
+  })();
+
+  // ===== AGENTS =====
+  document.getElementById('agentGrid').innerHTML = MOCK.agents.map(a => `
+    <div class="card card-hover fade-in">
+      <div class="flex between center mb-3">
+        <span class="mono text-xs muted">${String(a.id).padStart(2, '0')}</span>
+        <span class="prov prov-${a.prov}">${a.prov.toUpperCase()}</span>
       </div>
-      <h3 class="font-display font-semibold mb-2">${a.n}</h3>
-      <p class="text-sm text-fog">${a.d}</p>
-    </div>
-  `).join('');
+      <h3 class="mb-2">${a.name}</h3>
+      <div class="mb-3">${verdictBadge(a.verdict)}<span class="text-xs muted" style="margin-left:8px;">${a.confidence}% conf</span></div>
+      <ul style="list-style:none; font-size:12px; color:var(--muted); display:grid; gap:4px;">
+        ${a.bullets.map(b => `<li>• ${b}</li>`).join('')}
+      </ul>
+    </div>`).join('');
 
-  // ==== FAQ ====
-  const faqs = [
-    { q: 'Is Swing Scout financial advice?', a: 'No. It is a research and intelligence tool. All outputs are for educational and analytical purposes only. You are responsible for your own trades.' },
-    { q: 'What is the trading horizon?', a: 'Strictly 3–4 trading days on cash-market NSE equities. A hard Day-4 time stop closes any remaining position.' },
-    { q: 'What is the minimum capital?', a: 'The engine is calibrated for ₹15,000 baseline accounts, with 1% max risk per trade (₹150).' },
-    { q: 'How are charges handled?', a: 'Any setup where statutory charges exceed 15% of Target 1 profit is automatically disqualified.' },
-    { q: 'What happens on a drawdown?', a: 'A 5% weekly drawdown triggers a 3-day freeze. A 10% peak drawdown locks the desk into Paper Trading mode.' },
-    { q: 'Do you use derivatives?', a: 'No. Cash-market equities only. F&O data is used solely as a sentiment/OI signal input.' },
+  // ===== LIFECYCLE =====
+  const steps = [
+    { n: '01', t: 'Universe Screening', d: '7 distinct scans parse 40+ liquid NSE candidates each session.' },
+    { n: '02', t: 'Adversarial Audit', d: '13 agents vet liquidity, ASM/GSM, and geometry. The Critic challenges survivors.' },
+    { n: '03', t: 'Friction Sizing', d: 'Shares sized for ₹15k accounts. Charges > 15% of T1 → rejected.' },
+    { n: '04', t: '08:45 Pre-Open', d: 'Validation vs GIFT NIFTY. Gaps > 0.5% void the pick.' },
+    { n: '05', t: 'Day-4 Time Stop', d: 'Book half at T1, trail to breakeven, close rest at Day-4.' }
   ];
-  document.getElementById('faqList').innerHTML = faqs.map((f, i) => `
-    <details class="glass rounded-xl overflow-hidden group">
-      <summary class="cursor-pointer px-6 py-4 flex items-center justify-between font-medium">
+  document.getElementById('lifecycleGrid').innerHTML = steps.map(s => `
+    <div class="card card-hover fade-in">
+      <div class="mono text-xs mb-3" style="color:var(--primary);">${s.n}</div>
+      <h3 class="mb-2">${s.t}</h3>
+      <p class="text-sm muted">${s.d}</p>
+    </div>`).join('');
+
+  // ===== FAQ =====
+  document.getElementById('faqList').innerHTML = MOCK.faq.map(f => `
+    <details class="card fade-in" style="padding:0; overflow:hidden;">
+      <summary style="padding:18px 22px; cursor:pointer; font-weight:600; display:flex; justify-content:space-between; align-items:center;">
         <span>${f.q}</span>
-        <svg class="chev w-4 h-4 text-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+        <span style="color:var(--primary); font-size:20px;">+</span>
       </summary>
-      <div class="px-6 pb-5 text-sm text-fog">${f.a}</div>
-    </details>
-  `).join('');
+      <div style="padding:0 22px 18px; color:var(--muted); font-size:14px;">${f.a}</div>
+    </details>`).join('');
 
-  // ==== GROWTH SLIDER ====
-  const slider = document.getElementById('slider');
-  const monthlyEl = document.getElementById('monthly');
-  const progressBar = document.getElementById('progressBar');
-  function updateGrowth() {
-    const m = parseInt(slider.value);
-    monthlyEl.textContent = m.toLocaleString('en-IN');
-    const pct = Math.min(100, Math.round((m / 10000) * 100));
-    progressBar.style.width = pct + '%';
+  // ===== PLANNER SLIDER =====
+  const slider = document.getElementById('monthlySlider');
+  const val = document.getElementById('monthlyVal');
+  slider.addEventListener('input', () => {
+    val.textContent = Number(slider.value).toLocaleString('en-IN');
+  });
+
+  // ===== HERO GRID MOBILE FIX =====
+  function fixHeroGrid() {
+    const g = document.querySelector('.hero-grid');
+    if (!g) return;
+    if (window.innerWidth < 900) g.style.gridTemplateColumns = '1fr';
+    else g.style.gridTemplateColumns = '1.15fr 0.85fr';
   }
-  slider.addEventListener('input', updateGrowth);
-  updateGrowth();
-
-  // ==== FADE IN ON SCROLL ====
-  const io = new IntersectionObserver((entries) => {
-    entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
-  }, { threshold: 0.1 });
-  document.querySelectorAll('.fade-in').forEach(el => io.observe(el));
-
-  // ==== FAKE LIVE TICKER UPDATES ====
-  setInterval(() => {
-    // subtle pulse to feel alive
-    document.querySelectorAll('.animate-pulse').forEach(el => {
-      el.style.opacity = Math.random() > 0.5 ? '1' : '0.4';
-    });
-  }, 2000);
+  fixHeroGrid();
+  window.addEventListener('resize', fixHeroGrid);
 </script>
 
 </body>
