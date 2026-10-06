@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Trading Desk — Swing Scout</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);overflow-x:auto}
+.tab{padding:12px 18px;font-size:14px;font-weight:600;color:var(--muted);border:none;border-bottom:2px solid transparent;white-space:nowrap;background:none;cursor:pointer}
+.tab.active{color:var(--primary);border-bottom-color:var(--primary)}
+.tab-panel{display:none;padding-top:24px}
+.tab-panel.active{display:block}
+.stat-box{padding:18px 20px;border-radius:14px;background:var(--surface);border:1px solid var(--border)}
+.stat-box .label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+.stat-box .value{font-family:var(--font-mono);font-size:24px;font-weight:700;margin-top:6px}
+.stat-box .sub{font-size:12px;color:var(--muted);margin-top:4px}
+.mode-badge{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:700;border:none;cursor:pointer}
+.mode-paper{background:var(--indigo-soft);color:var(--indigo)}
+.mode-live{background:var(--primary-soft);color:var(--primary)}
+.mode-locked{background:var(--surface-2);color:var(--muted)}
+.journal-row{display:grid;grid-template-columns:90px 1fr 80px 80px 60px 40px;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);align-items:center;font-size:13px}
+.journal-row.head{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+.r-pos{color:var(--primary);font-weight:700}
+.r-neg{color:var(--coral);font-weight:700}
+.journal-row button{color:var(--coral);font-size:20px;background:none;border:none;cursor:pointer}
+.setting-row{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--border);gap:16px}
+.setting-input{width:120px;padding:8px 12px;text-align:right;font-family:var(--font-mono);font-size:14px;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;color:var(--ink)}
+.curve{width:100%;height:180px;background:var(--surface-2);border-radius:14px;padding:12px}
+.curve svg{width:100%;height:100%}
+@media(max-width:700px){
+  .journal-row{grid-template-columns:80px 1fr 60px 40px;font-size:12px}
+  .journal-row>*:nth-child(3),.journal-row>*:nth-child(5){display:none}
+}
+</style>
+</head>
+<body data-page="desk.html">
+<div id="nav-slot"></div>
+
+<section style="padding:48px 0 20px">
+  <div class="container">
+    <div class="flex between center wrap gap-3 mb-4">
+      <div>
+        <p class="kicker mono" style="color:var(--primary);margin-bottom:6px">// TRADING DESK</p>
+        <h1 style="font-size:clamp(1.8rem,5vw,2.6rem)">Paper-trade, journal, and track.</h1>
+      </div>
+      <div class="flex gap-2">
+        <span id="modeBadge" class="mode-badge mode-paper">📝 Paper Mode</span>
+        <span class="demo-chip">Phase 1 · Local</span>
+      </div>
+    </div>
+    <p class="muted" style="max-width:640px">Default is paper trading. Settings and journal entries save in this browser.</p>
+  </div>
+</section>
+
+<section class="container" style="padding-bottom:64px">
+  <div class="tabs">
+    <button class="tab active" data-tab="today">Today</button>
+    <button class="tab" data-tab="open">Open Trades</button>
+    <button class="tab" data-tab="journal">Journal</button>
+    <button class="tab" data-tab="performance">Performance</button>
+    <button class="tab" data-tab="planner">Planner</button>
+    <button class="tab" data-tab="settings">Settings</button>
+  </div>
+
+  <div class="tab-panel active" data-panel="today">
+    <div class="flex between center wrap gap-3 mb-4">
+      <div><h3>Today's picks</h3><p class="muted text-sm">From the last Console run.</p></div>
+      <button class="btn btn-ghost btn-sm" id="loadDemoBtn">Load Demo Picks</button>
+    </div>
+    <div id="todayGrid"></div>
+    <div id="todayEmpty" class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:40px;margin-bottom:12px">📭</div>
+      <p class="muted">No picks loaded yet.</p>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="open">
+    <div class="flex between center wrap gap-3 mb-4">
+      <div><h3>Open paper trades</h3></div>
+      <button class="btn btn-ghost btn-sm" id="refreshPnL">Refresh</button>
+    </div>
+    <div id="openGrid"></div>
+    <div id="openEmpty" class="card" style="text-align:center;padding:48px 24px">
+      <div style="font-size:40px;margin-bottom:12px">📊</div>
+      <p class="muted">No open positions.</p>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="journal">
+    <div class="flex between center wrap gap-3 mb-4">
+      <div><h3>Trade journal</h3></div>
+      <button class="btn btn-primary btn-sm" id="addJournalBtn">+ Add Entry</button>
+    </div>
+    <div class="card">
+      <div class="journal-row head">
+        <div>Symbol</div><div>Setup / Notes</div>
+        <div style="text-align:right">Entry</div>
+        <div style="text-align:right">Exit</div>
+        <div style="text-align:right">R</div>
+        <div></div>
+      </div>
+      <div id="journalList"></div>
+      <div id="journalEmpty" style="padding:32px;text-align:center;color:var(--muted);font-size:14px">No journal entries yet.</div>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="performance">
+    <h3 class="mb-4">Performance</h3>
+    <div class="grid grid-4 mb-4">
+      <div class="stat-box"><div class="label">Total Trades</div><div class="value" id="pTotal">0</div></div>
+      <div class="stat-box"><div class="label">Win Rate</div><div class="value" id="pWin">—</div></div>
+      <div class="stat-box"><div class="label">Avg R</div><div class="value" id="pAvgR">—</div></div>
+      <div class="stat-box"><div class="label">Expectancy</div><div class="value" id="pExp">—</div></div>
+    </div>
+    <div class="grid grid-4 mb-6">
+      <div class="stat-box"><div class="label">Profit Factor</div><div class="value" id="pPf">—</div></div>
+      <div class="stat-box"><div class="label">Best R</div><div class="value" id="pBest">—</div></div>
+      <div class="stat-box"><div class="label">Worst R</div><div class="value" id="pWorst">—</div></div>
+      <div class="stat-box"><div class="label">Trades Needed</div><div class="value">30</div></div>
+    </div>
+    <div class="card">
+      <div class="text-xs mono muted mb-3">// EQUITY CURVE (cumulative R)</div>
+      <div class="curve">
+        <svg viewBox="0 0 400 180" preserveAspectRatio="none">
+          <line x1="0" y1="90" x2="400" y2="90" stroke="var(--border)" stroke-width="1" stroke-dasharray="4 4"/>
+          <polyline id="curveLine" fill="none" stroke="var(--primary)" stroke-width="2" points=""/>
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="planner">
+    <h3 class="mb-2">Growth planner</h3>
+    <p class="muted text-sm mb-6">Simulate growth with 1% risk and monthly top-ups.</p>
+    <div class="card mb-4">
+      <div class="grid grid-3 mb-6">
+        <div><div class="text-xs muted mb-2">Starting capital</div><input type="number" class="setting-input" id="plStart" value="15000" style="width:100%;text-align:left"/></div>
+        <div><div class="text-xs muted mb-2">Monthly top-up</div><input type="number" class="setting-input" id="plTop" value="2500" style="width:100%;text-align:left"/></div>
+        <div><div class="text-xs muted mb-2">Target</div><input type="number" class="setting-input" id="plTarget" value="100000" style="width:100%;text-align:left"/></div>
+      </div>
+      <div class="grid grid-3">
+        <div class="stat-box"><div class="label">Edge 2% / mo</div><div class="value" id="plE2">—</div><div class="sub" id="plE2m">—</div></div>
+        <div class="stat-box" style="border-color:var(--primary)"><div class="label">Edge 4% / mo</div><div class="value" id="plE4" style="color:var(--primary)">—</div><div class="sub" id="plE4m">—</div></div>
+        <div class="stat-box"><div class="label">Edge 7% / mo</div><div class="value" id="plE7">—</div><div class="sub" id="plE7m">—</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="settings">
+    <h3 class="mb-4">Settings</h3>
+    <div class="card mb-4">
+      <div class="setting-row">
+        <div><div>Mode</div><div class="muted text-xs">Live locked until 30+ paper trades</div></div>
+        <div class="flex gap-2">
+          <button class="mode-badge mode-paper" id="setPaper">Paper</button>
+          <button class="mode-badge mode-locked" id="setLive">🔒 Live</button>
+        </div>
+      </div>
+      <div class="setting-row"><div>Capital (₹)</div><input type="number" class="setting-input" id="setCapital" value="15000"/></div>
+      <div class="setting-row"><div>Risk per trade (%)</div><input type="number" step="0.1" class="setting-input" id="setRisk" value="1"/></div>
+      <div class="setting-row"><div>Max positions</div><input type="number" class="setting-input" id="setMaxPos" value="3"/></div>
+      <div class="setting-row"><div>Max open risk (%)</div><input type="number" step="0.1" class="setting-input" id="setMaxRisk" value="3"/></div>
+      <div class="setting-row"><div>Max trades / week</div><input type="number" class="setting-input" id="setMaxTrades" value="2"/></div>
+      <div class="setting-row" style="border:none"><div>Est. charges (₹)</div><input type="number" class="setting-input" id="setCharges" value="40"/></div>
+    </div>
+    <div class="flex gap-2">
+      <button class="btn btn-primary btn-sm" id="saveSettings">Save Settings</button>
+      <button class="btn btn-ghost btn-sm" id="resetSettings">Reset</button>
+    </div>
+    <p id="settingsSaved" class="text-xs muted mt-3" style="opacity:0">✓ Saved</p>
+  </div>
+</section>
+
+<div id="journalModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:center;justify-content:center;padding:20px">
+  <div class="card" style="max-width:480px;width:100%;max-height:90vh;overflow-y:auto">
+    <h3 class="mb-4">Add journal entry</h3>
+    <label class="field"><span>Symbol</span><input type="text" class="input mono" id="jSymbol"/></label>
+    <label class="field"><span>Setup</span>
+      <select class="select" id="jSetup">
+        <option>Pullback to 20-DMA</option>
+        <option>Breakout</option>
+        <option>Base breakout</option>
+        <option>Reversal at support</option>
+      </select>
+    </label>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <label class="field"><span>Entry</span><input type="number" step="0.01" class="input" id="jEntry"/></label>
+      <label class="field"><span>Exit</span><input type="number" step="0.01" class="input" id="jExit"/></label>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <label class="field"><span>Stop</span><input type="number" step="0.01" class="input" id="jStop"/></label>
+      <label class="field"><span>Quantity</span><input type="number" class="input" id="jQty"/></label>
+    </div>
+    <label class="field"><span>Notes</span><textarea class="textarea" id="jNotes" rows="3"></textarea></label>
+    <div class="flex gap-2 mt-4">
+      <button class="btn btn-primary" id="jSave" style="flex:1;justify-content:center">Save</button>
+      <button class="btn btn-ghost" id="jCancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="footer-slot"></div>
